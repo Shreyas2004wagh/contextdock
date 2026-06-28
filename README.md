@@ -11,13 +11,39 @@ The product makes Cognee's memory lifecycle the core user workflow:
 - `improve()` enriches the project's memory graph after a working session.
 - `forget()` prunes the selected project dataset.
 
+## Demo-ready features
+
+- One-click **Run Demo** path for judges.
+- Codex-style coding session memory for files changed, commands run, decisions, blockers, and next tasks.
+- Memory timeline that shows the Cognee lifecycle calls made for the selected project.
+- Source labels for remembered notes, URLs, files, coding sessions, and recall answers.
+- Morning brief recall that asks Cognee for yesterday's decisions, blockers, files that matter, and next actions.
+
+## Cognee lifecycle mapping
+
+| Product action | Cognee lifecycle | Backend route |
+| --- | --- | --- |
+| Remember note, URL, file, or session | `remember()` | `/memory/remember/*` |
+| Ask a question or morning brief | `recall()` | `/memory/recall` |
+| Enrich project memory after work | `improve()` / `cognify` | `/memory/improve` |
+| Prune selected project memory | `forget()` | `/memory/forget` |
+
 ## App flow
 
 1. Create a project memory space.
-2. Paste context from yesterday, upload a file, or ingest a URL.
-3. Ask questions like "What should I work on today?"
-4. Generate a morning brief from remembered decisions, blockers, and next actions.
+2. Paste context from yesterday, upload a file, ingest a URL, or remember a Codex coding session.
+3. Ask questions like "What was I working on yesterday?" or "What files matter?"
+4. Generate a morning brief from remembered decisions, blockers, files, and next actions.
 5. Improve or forget the selected project memory when needed.
+
+## Demo script
+
+1. Start the backend and frontend.
+2. Open `http://127.0.0.1:5173`.
+3. Click **Run Demo**.
+4. Show the lifecycle rail and Memory Timeline as the app stores a coding session, improves the memory graph, and asks judge-ready recall questions.
+5. Click **Morning Brief** to prove the agent can wake up with yesterday's project context.
+6. Optionally click **Forget** to show memory pruning for the selected project dataset.
 
 ## Setup
 
@@ -37,6 +63,8 @@ COGNEE_TENANT_ID=your-tenant-id
 ```
 
 `.env` is ignored by git. Do not put the API key in frontend code.
+
+If an API key was ever shared in chat, screenshots, or a recording, rotate it before submitting publicly.
 
 Install frontend dependencies:
 
