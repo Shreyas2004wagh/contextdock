@@ -17,6 +17,16 @@ class RememberUrlRequest(BaseModel):
     url: str = Field(min_length=1)
 
 
+class RememberSessionRequest(BaseModel):
+    project_id: str = Field(min_length=1, max_length=80)
+    summary: str = Field(min_length=1)
+    files_changed: str = ""
+    commands_run: str = ""
+    decisions: str = ""
+    blockers: str = ""
+    next_tasks: str = ""
+
+
 class RecallRequest(BaseModel):
     project_id: str = Field(min_length=1, max_length=80)
     query: str = Field(min_length=1)
@@ -28,4 +38,3 @@ class ImproveRequest(BaseModel):
 
 class ForgetRequest(BaseModel):
     project_id: str = Field(min_length=1, max_length=80)
-

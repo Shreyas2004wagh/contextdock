@@ -33,10 +33,11 @@ from .models import (
     ImproveRequest,
     ProjectCreate,
     RecallRequest,
+    RememberSessionRequest,
     RememberTextRequest,
     RememberUrlRequest,
 )
-from .store import create_project, ensure_project, list_projects, touch_project
+from .store import create_project, ensure_project, list_project_events, list_projects, log_event, touch_project
 
 
 app = FastAPI(title="Where's My Context API")
@@ -60,6 +61,14 @@ async def projects() -> list[dict]:
     return list_projects()
 
 
+@app.get("/projects/{project_id}/events")
+async def project_events(project_id: str) -> list[dict]:
+    try:
+        return list_project_events(project_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Project not found") from None
+
+
 @app.post("/projects")
 async def add_project(payload: ProjectCreate) -> dict:
     return create_project(payload.name, payload.description)
@@ -71,6 +80,7 @@ async def remember_text(payload: RememberTextRequest) -> dict:
         ensure_project(payload.project_id)
         await cognee_memory.remember_text(payload.project_id, payload.title, payload.content)
         touch_project(payload.project_id)
+        log_event(payload.project_id, "remember()", "note", payload.title, payload.content[:280])
     except KeyError:
         raise HTTPException(status_code=404, detail="Project not found") from None
     except Exception as exc:
@@ -84,6 +94,7 @@ async def remember_url(payload: RememberUrlRequest) -> dict:
         ensure_project(payload.project_id)
         await cognee_memory.remember_url(payload.project_id, payload.url)
         touch_project(payload.project_id)
+        log_event(payload.project_id, "remember()", "url", "URL ingested", payload.url)
     except KeyError:
         raise HTTPException(status_code=404, detail="Project not found") from None
     except Exception as exc:
@@ -105,6 +116,7 @@ async def remember_file(project_id: str, file: UploadFile = File(...)) -> dict:
             temp_file.write(await file.read())
         await cognee_memory.remember_file(project_id, temp_path)
         touch_project(project_id)
+        log_event(project_id, "remember()", "file", "File uploaded", file.filename or "uploaded file")
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     finally:
@@ -113,11 +125,43 @@ async def remember_file(project_id: str, file: UploadFile = File(...)) -> dict:
     return {"status": "remembered"}
 
 
+def _format_session_memory(payload: RememberSessionRequest) -> str:
+    sections = [
+        ("Session summary", payload.summary),
+        ("Files changed", payload.files_changed),
+        ("Commands run", payload.commands_run),
+        ("Decisions made", payload.decisions),
+        ("Blockers", payload.blockers),
+        ("Next tasks", payload.next_tasks),
+    ]
+    lines = ["# Codex coding session memory", ""]
+    for heading, value in sections:
+        clean_value = value.strip() or "None captured."
+        lines.extend([f"## {heading}", clean_value, ""])
+    return "\n".join(lines).strip()
+
+
+@app.post("/memory/remember/session")
+async def remember_session(payload: RememberSessionRequest) -> dict:
+    try:
+        ensure_project(payload.project_id)
+        session_memory = _format_session_memory(payload)
+        await cognee_memory.remember_text(payload.project_id, "Codex coding session", session_memory)
+        touch_project(payload.project_id)
+        log_event(payload.project_id, "remember()", "session", "Codex session remembered", payload.summary[:280])
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Project not found") from None
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return {"status": "remembered"}
+
+
 @app.post("/memory/recall")
 async def recall(payload: RecallRequest) -> dict:
     try:
         ensure_project(payload.project_id)
         answer = await cognee_memory.recall(payload.project_id, payload.query)
+        log_event(payload.project_id, "recall()", "query", payload.query, answer[:280])
     except KeyError:
         raise HTTPException(status_code=404, detail="Project not found") from None
     except Exception as exc:
@@ -131,6 +175,7 @@ async def improve(payload: ImproveRequest) -> dict:
         ensure_project(payload.project_id)
         await cognee_memory.improve(payload.project_id)
         touch_project(payload.project_id)
+        log_event(payload.project_id, "improve()", "system", "Memory graph improved", "Cognee enriched this project memory.")
     except KeyError:
         raise HTTPException(status_code=404, detail="Project not found") from None
     except Exception as exc:
@@ -144,6 +189,7 @@ async def forget(payload: ForgetRequest) -> dict:
         ensure_project(payload.project_id)
         await cognee_memory.forget(payload.project_id)
         touch_project(payload.project_id)
+        log_event(payload.project_id, "forget()", "system", "Dataset forgotten", "Cognee pruned the selected project dataset.")
     except KeyError:
         raise HTTPException(status_code=404, detail="Project not found") from None
     except Exception as exc:
