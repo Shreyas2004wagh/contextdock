@@ -11,6 +11,17 @@ The product makes Cognee's memory lifecycle the core user workflow:
 - `improve()` enriches the project's memory graph after a working session.
 - `forget()` prunes the selected project dataset.
 
+## Submission pitch
+
+Agents and LLM tools wake up stateless. **Where's My Context?** gives them a persistent project brain, so a coding agent can remember yesterday's files, commands, decisions, blockers, and next tasks before starting the next session.
+
+Cognee is central because the app does not just save local notes:
+
+- every project gets a Cognee-scoped dataset;
+- every note, URL, file, and Codex-style session enters Cognee through `remember()`;
+- answers and morning briefs come back through Cognee `recall()`;
+- the timeline makes the memory lifecycle visible for judges.
+
 ## Demo-ready features
 
 - One-click **Run Demo** path for judges.
@@ -18,6 +29,11 @@ The product makes Cognee's memory lifecycle the core user workflow:
 - Memory timeline that shows the Cognee lifecycle calls made for the selected project.
 - Source labels for remembered notes, URLs, files, coding sessions, and recall answers.
 - Morning brief recall that asks Cognee for yesterday's decisions, blockers, files that matter, and next actions.
+- Memory Proof panel showing provider mode, dataset name, remembered source count, and latest lifecycle call.
+
+## Screenshot
+
+![Where's My Context demo workbench](docs/demo-workbench.png)
 
 ## Cognee lifecycle mapping
 

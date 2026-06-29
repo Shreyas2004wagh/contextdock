@@ -17,11 +17,13 @@ import {
   Trash2,
 } from "lucide-react";
 import {
+  Health,
   MemoryEvent,
   Project,
   SessionMemory,
   createProject,
   forget,
+  getHealth,
   getProjectEvents,
   getProjects,
   improve,
@@ -74,6 +76,7 @@ const judgePrompts = [
 function App() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [events, setEvents] = useState<MemoryEvent[]>([]);
+  const [health, setHealth] = useState<Health | null>(null);
   const [selectedId, setSelectedId] = useState("");
   const [newName, setNewName] = useState("Hackathon Memory Agent");
   const [newDescription, setNewDescription] = useState("A persistent project brain powered by Cognee.");
@@ -98,7 +101,18 @@ function App() {
     return sources.length ? `Related remembered sources: ${Array.from(new Set(sources)).join(", ")}` : undefined;
   }, [events]);
 
+  const rememberedSourceCount = useMemo(
+    () => events.filter((event) => event.lifecycle === "remember()").length,
+    [events],
+  );
+
+  const lastLifecycle = events[0]?.lifecycle ?? "waiting";
+  const selectedDataset = selectedId ? `project-${selectedId}` : "No dataset selected";
+
   useEffect(() => {
+    getHealth()
+      .then(setHealth)
+      .catch(() => setHealth(null));
     getProjects()
       .then((items) => {
         setProjects(items);
@@ -296,6 +310,23 @@ function App() {
                 <p>{step.detail}</p>
               </div>
             ))}
+          </section>
+
+          <section className="panel proof-panel">
+            <div className="panel-heading">
+              <ShieldCheck size={20} />
+              <h2>Memory Proof</h2>
+            </div>
+            <div className="proof-grid">
+              <span>Provider</span>
+              <strong>{health?.memory_mode === "cloud" ? "Cognee Cloud" : "Local Cognee SDK"}</strong>
+              <span>Dataset</span>
+              <strong>{selectedDataset}</strong>
+              <span>Remembered</span>
+              <strong>{rememberedSourceCount} sources</strong>
+              <span>Last call</span>
+              <strong>{lastLifecycle}</strong>
+            </div>
           </section>
 
           <form className="panel" onSubmit={handleCreateProject}>

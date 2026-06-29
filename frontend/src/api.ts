@@ -27,6 +27,11 @@ export type SessionMemory = {
   next_tasks: string;
 };
 
+export type Health = {
+  status: string;
+  memory_mode: "cloud" | "local";
+};
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     headers: options?.body instanceof FormData ? undefined : { "Content-Type": "application/json" },
@@ -37,6 +42,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error(error.detail ?? "Request failed");
   }
   return response.json() as Promise<T>;
+}
+
+export function getHealth() {
+  return request<Health>("/health");
 }
 
 export function getProjects() {

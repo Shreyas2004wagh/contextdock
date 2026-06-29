@@ -53,7 +53,8 @@ app.add_middleware(
 
 @app.get("/health")
 async def health() -> dict[str, str]:
-    return {"status": "ok"}
+    memory_mode = "cloud" if os.getenv("COGNEE_API_BASE_URL") and os.getenv("COGNEE_API_KEY") else "local"
+    return {"status": "ok", "memory_mode": memory_mode}
 
 
 @app.get("/projects")
