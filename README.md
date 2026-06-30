@@ -62,15 +62,6 @@ Cognee is central because the app does not just save local notes:
 4. Generate a morning brief from remembered decisions, blockers, files, and next actions.
 5. Improve or forget the selected project memory when needed.
 
-## Demo script
-
-1. Start the backend and frontend.
-2. Open `http://127.0.0.1:5173`.
-3. Click **Run Demo**.
-4. Show the lifecycle rail and Memory Timeline as the app stores a coding session, improves the memory graph, and asks judge-ready recall questions.
-5. Click **Morning Brief** to prove the agent can wake up with yesterday's project context.
-6. Optionally click **Forget** to show memory pruning for the selected project dataset.
-
 ## Setup
 
 ```powershell
