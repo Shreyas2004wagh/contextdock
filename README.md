@@ -30,6 +30,16 @@ Cognee is central because the app does not just save local notes:
 - Source labels for remembered notes, URLs, files, coding sessions, and recall answers.
 - Morning brief recall that asks Cognee for yesterday's decisions, blockers, files that matter, and next actions.
 - Memory Proof panel showing provider mode, dataset name, remembered source count, and latest lifecycle call.
+- First-screen command center focused on the winning moment: a coding agent wakes up and Cognee remembers yesterday.
+
+## Judging criteria fit
+
+- **Potential Impact:** agents resume project work with remembered files, decisions, blockers, and next tasks.
+- **Creativity & Innovation:** Codex-style coding sessions become persistent memory, not throwaway chat logs.
+- **Technical Excellence:** FastAPI + React expose project-scoped Cognee lifecycle workflows.
+- **Best Use of Cognee:** `remember()`, `recall()`, `improve()`, and `forget()` are all visible product actions.
+- **User Experience:** Run Demo, Morning Brief, Memory Proof, and timeline appear before the editing forms.
+- **Presentation Quality:** the app, README, screenshot, and submission notes tell the same memory story.
 
 ## Screenshot
 
@@ -107,24 +117,8 @@ npm run dev
 
 Open `http://127.0.0.1:5173`.
 
-## 3-day build plan
+## Submission notes
 
-### Day 1: Working memory loop
-
-- Backend endpoints for `remember`, `recall`, `improve`, and `forget`.
-- Project-scoped datasets.
-- Frontend controls for notes, URLs, files, recall chat, morning brief, improve, and forget.
-
-### Day 2: Better demo and retrieval
-
-- Add sample project memories and one-click demo seed.
-- Add memory timeline and source labels.
-- Improve file and URL ingestion UX.
-- Tune prompts for morning brief and decision recovery.
-
-### Day 3: Hackathon polish
-
-- Record a short demo: cold start, remember, recall next action, improve, forget.
-- Add deployment docs.
-- Create submission screenshots.
-- Tighten README and pitch.
+- Rotate any exposed Cognee API key before submitting publicly.
+- The app declares AI assistant usage in `SUBMISSION.md`, as required by the hackathon rules.
+- Use the screenshot and demo script above for the submission page.

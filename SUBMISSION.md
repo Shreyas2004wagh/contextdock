@@ -32,6 +32,19 @@ Where's My Context? gives each project a Cognee-backed memory space. Users can r
 
 The demo is not a generic chat app with saved messages. It is a builder-focused memory workflow for agents: session summaries, source labels, project-scoped datasets, lifecycle visibility, and a next-morning recall story that maps directly to real coding work.
 
+## Judging Criteria Fit
+
+- **Potential Impact:** coding agents and LLM tools can resume real project work instead of starting from a blank context window.
+- **Creativity & Innovation:** the project turns Codex-style work sessions into persistent project memory, not just chat history.
+- **Technical Excellence:** FastAPI and React connect to Cognee lifecycle APIs with project-scoped datasets and local timeline metadata.
+- **Best Use of Cognee:** `remember()`, `recall()`, `improve()`, and `forget()` are visible, demoable product actions.
+- **User Experience:** the first screen is a judge-ready command center with Run Demo, Morning Brief, Memory Proof, and lifecycle activity.
+- **Presentation Quality:** the README, screenshot, and demo flow all explain the same story: the agent wakes up and Cognee remembers.
+
+## AI Assistant Disclosure
+
+This project was built with help from AI coding assistants, including OpenAI Codex, for planning, implementation, UI iteration, documentation, and validation. The project concept, product direction, testing decisions, and final submission choices were directed by the human participant.
+
 ## Roadmap
 
 - Source-backed answer citations from Cognee recall results when available.
