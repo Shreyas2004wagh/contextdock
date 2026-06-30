@@ -60,11 +60,14 @@ const demoSession: SessionMemory = {
     "Add Run Demo, remember coding-session summaries, show memory timeline, and ask morning brief recall questions.",
 };
 
+const morningPrompt =
+  "Give me a concise morning context brief with yesterday's decisions, blockers, files that matter, and next actions.";
+
 const lifecycleSteps = [
-  { name: "remember()", detail: "notes, URLs, files, sessions" },
-  { name: "recall()", detail: "morning brief and next actions" },
-  { name: "improve()", detail: "graph enrichment after work" },
-  { name: "forget()", detail: "project memory pruning" },
+  { name: "remember()", detail: "Store sessions, notes, files, and URLs." },
+  { name: "recall()", detail: "Recover yesterday's project context." },
+  { name: "improve()", detail: "Enrich the selected memory graph." },
+  { name: "forget()", detail: "Prune a project dataset safely." },
 ];
 
 const judgePrompts = [
@@ -87,27 +90,32 @@ function App() {
   const [query, setQuery] = useState(judgePrompts[0]);
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [busy, setBusy] = useState(false);
+  const [demoStage, setDemoStage] = useState("Ready for a judge-safe walkthrough.");
+  const [morningBriefAnswer, setMorningBriefAnswer] = useState("");
 
   const selectedProject = useMemo(
     () => projects.find((project) => project.id === selectedId),
     [projects, selectedId],
   );
 
-  const recentSources = useMemo(() => {
-    const sources = events
-      .filter((event) => event.lifecycle === "remember()")
-      .map((event) => event.source)
-      .slice(0, 4);
-    return sources.length ? `Related remembered sources: ${Array.from(new Set(sources)).join(", ")}` : undefined;
-  }, [events]);
-
   const rememberedSourceCount = useMemo(
     () => events.filter((event) => event.lifecycle === "remember()").length,
     [events],
   );
 
+  const sourceSummary = useMemo(() => {
+    const counts = events
+      .filter((event) => event.lifecycle === "remember()")
+      .reduce<Record<string, number>>((summary, event) => {
+        summary[event.source] = (summary[event.source] ?? 0) + 1;
+        return summary;
+      }, {});
+    return Object.entries(counts);
+  }, [events]);
+
   const lastLifecycle = events[0]?.lifecycle ?? "waiting";
   const selectedDataset = selectedId ? `project-${selectedId}` : "No dataset selected";
+  const latestAnswer = feed.find((item) => item.kind === "answer");
 
   useEffect(() => {
     getHealth()
@@ -150,6 +158,7 @@ function App() {
       await action();
     } catch (error) {
       push("system", "system", "Request failed", error instanceof Error ? error.message : String(error));
+      setDemoStage("Something needs attention before the demo can continue.");
     } finally {
       setBusy(false);
     }
@@ -162,10 +171,31 @@ function App() {
     return selectedId;
   }
 
-  async function ask(projectId: string, question: string) {
+  function relatedSources() {
+    const sources = events
+      .filter((event) => event.lifecycle === "remember()")
+      .map((event) => event.source)
+      .slice(0, 4);
+    return sources.length ? `Sources: ${Array.from(new Set(sources)).join(", ")}` : undefined;
+  }
+
+  async function ask(projectId: string, question: string, pinMorningBrief = false) {
     const result = await recall(projectId, question);
-    push("answer", "recall()", question, result.answer, recentSources);
+    push("answer", "recall()", question, result.answer, relatedSources());
+    if (pinMorningBrief) {
+      setMorningBriefAnswer(result.answer);
+    }
     await refreshEvents(projectId);
+  }
+
+  async function createFreshDemoProject() {
+    const project = await createProject("Where's My Context Demo", "Judge-ready coding-agent memory demo.");
+    setProjects((items) => [project, ...items]);
+    setSelectedId(project.id);
+    setMorningBriefAnswer("");
+    setDemoStage("Fresh demo project created.");
+    await refreshEvents(project.id);
+    return project.id;
   }
 
   function handleCreateProject(event: FormEvent) {
@@ -223,34 +253,47 @@ function App() {
   function handleRecall(event: FormEvent) {
     event.preventDefault();
     withBusy(async () => {
-      await ask(requireProject(), query);
+      setDemoStage("recall() is asking Cognee for project context.");
+      await ask(requireProject(), query, query === morningPrompt);
+      setDemoStage("recall() returned context from the selected project memory.");
     });
   }
 
   function handleMorningBrief() {
-    const morningPrompt =
-      "Give me a concise morning context brief with yesterday's decisions, blockers, files that matter, and next actions.";
     setQuery(morningPrompt);
     withBusy(async () => {
-      await ask(requireProject(), morningPrompt);
+      setDemoStage("recall() is building the morning brief.");
+      await ask(requireProject(), morningPrompt, true);
+      setDemoStage("Morning brief recovered from Cognee memory.");
     });
   }
 
   function handleImprove() {
     withBusy(async () => {
       const projectId = requireProject();
+      setDemoStage("improve() is enriching the memory graph.");
       await improve(projectId);
       push("system", "improve()", "Memory improved", "Cognee enriched this project memory graph.");
       await refreshEvents(projectId);
+      setDemoStage("improve() completed for the selected project.");
     });
   }
 
   function handleForget() {
     withBusy(async () => {
       const projectId = requireProject();
+      setDemoStage("forget() is pruning the selected dataset.");
       await forget(projectId);
       push("system", "forget()", "Dataset forgotten", "The selected project's Cognee dataset was pruned.");
+      setMorningBriefAnswer("");
       await refreshEvents(projectId);
+      setDemoStage("forget() completed. The selected dataset was pruned.");
+    });
+  }
+
+  function handleFreshDemoProject() {
+    withBusy(async () => {
+      await createFreshDemoProject();
     });
   }
 
@@ -258,26 +301,35 @@ function App() {
     withBusy(async () => {
       let projectId = selectedId;
       if (!projectId) {
-        const project = await createProject("Where's My Context Demo", "Judge-ready coding-agent memory demo.");
-        setProjects((items) => [project, ...items]);
-        setSelectedId(project.id);
-        projectId = project.id;
+        projectId = await createFreshDemoProject();
       }
 
+      setDemoStage("remember() is storing the Codex session.");
       await rememberSession(projectId, demoSession);
       push("memory", "session", "Demo session remembered", demoSession.summary);
+      await refreshEvents(projectId);
 
+      setDemoStage("remember() is storing the project note.");
       await rememberText(projectId, "Demo project context", demoMemory);
       push("memory", "note", "Demo context remembered", demoMemory);
+      await refreshEvents(projectId);
 
+      setDemoStage("improve() is enriching the graph.");
       await improve(projectId);
       push("system", "improve()", "Memory graph improved", "Cognee enriched the demo project memory.");
+      await refreshEvents(projectId);
 
       for (const prompt of judgePrompts) {
         setQuery(prompt);
+        setDemoStage(`recall() is answering: ${prompt}`);
         await ask(projectId, prompt);
       }
+
+      setQuery(morningPrompt);
+      setDemoStage("recall() is producing the final morning brief.");
+      await ask(projectId, morningPrompt, true);
       await refreshEvents(projectId);
+      setDemoStage("Demo complete. The agent woke up with yesterday's memory.");
     });
   }
 
@@ -287,48 +339,254 @@ function App() {
 
   return (
     <main className="shell">
-      <section className="workspace">
-        <aside className="sidebar">
-          <div className="brand">
-            <Brain size={28} />
-            <div>
-              <h1>Where's My Context?</h1>
-              <p>Persistent Cognee memory for agents that should not wake up cold.</p>
-            </div>
+      <section className="hero-panel">
+        <div className="hero-copy">
+          <span className="eyebrow">Cognee memory for coding agents</span>
+          <h1>Your coding agent woke up. Cognee remembers yesterday.</h1>
+          <p>
+            Where's My Context? turns project notes, files, URLs, and Codex sessions into persistent memory so the next
+            work session starts with decisions, blockers, files, and next actions already recovered.
+          </p>
+          <div className="hero-actions">
+            <button className="demo-button" disabled={busy} onClick={handleRunDemo} type="button">
+              <Play size={18} />
+              {busy ? "Running..." : "Run Demo"}
+            </button>
+            <button className="secondary" disabled={busy} onClick={handleFreshDemoProject} type="button">
+              <Sparkles size={18} />
+              Fresh Demo Project
+            </button>
+            <button className="secondary" disabled={busy || !selectedId} onClick={handleMorningBrief} type="button">
+              <Lightbulb size={18} />
+              Morning Brief
+            </button>
           </div>
+          <p className="demo-stage">{demoStage}</p>
+        </div>
 
-          <button className="demo-button" disabled={busy} onClick={handleRunDemo} type="button">
-            <Play size={18} />
-            Run Demo
-          </button>
+        <section className="brief-panel">
+          <div className="panel-heading">
+            <MessageSquareText size={20} />
+            <h2>Morning Brief</h2>
+          </div>
+          <div className="brief-grid">
+            <article>
+              <span>Decision</span>
+              <p>{session.decisions}</p>
+            </article>
+            <article>
+              <span>Files</span>
+              <p>{session.files_changed}</p>
+            </article>
+            <article>
+              <span>Blocker</span>
+              <p>{session.blockers}</p>
+            </article>
+            <article>
+              <span>Next action</span>
+              <p>{session.next_tasks}</p>
+            </article>
+          </div>
+          <div className="brief-answer">
+            <span>{morningBriefAnswer ? "Cognee recall answer" : "Waiting for recall()"}</span>
+            <p>
+              {morningBriefAnswer ||
+                latestAnswer?.body ||
+                "Click Run Demo or Morning Brief to let Cognee reconstruct yesterday's working context."}
+            </p>
+          </div>
+        </section>
+      </section>
 
-          <section className="panel lifecycle">
-            <h2>Cognee Lifecycle</h2>
+      <section className="proof-row">
+        <section className="panel proof-panel">
+          <div className="panel-heading">
+            <ShieldCheck size={20} />
+            <h2>Memory Proof</h2>
+          </div>
+          <div className="proof-grid">
+            <span>Provider</span>
+            <strong>{health?.memory_mode === "cloud" ? "Cognee Cloud" : "Local Cognee SDK"}</strong>
+            <span>Dataset</span>
+            <strong>{selectedDataset}</strong>
+            <span>Remembered</span>
+            <strong>{rememberedSourceCount} sources</strong>
+            <span>Last call</span>
+            <strong>{lastLifecycle}</strong>
+          </div>
+          <div className="source-strip">
+            {sourceSummary.length ? (
+              sourceSummary.map(([source, count]) => (
+                <span className="source" key={source}>
+                  {source} {count}
+                </span>
+              ))
+            ) : (
+              <span className="source">no sources yet</span>
+            )}
+          </div>
+        </section>
+
+        <section className="panel lifecycle">
+          <h2>Cognee Lifecycle</h2>
+          <div className="lifecycle-grid">
             {lifecycleSteps.map((step) => (
               <div className="lifecycle-step" key={step.name}>
                 <span>{step.name}</span>
                 <p>{step.detail}</p>
               </div>
             ))}
-          </section>
+          </div>
+        </section>
 
-          <section className="panel proof-panel">
-            <div className="panel-heading">
-              <ShieldCheck size={20} />
-              <h2>Memory Proof</h2>
-            </div>
-            <div className="proof-grid">
-              <span>Provider</span>
-              <strong>{health?.memory_mode === "cloud" ? "Cognee Cloud" : "Local Cognee SDK"}</strong>
-              <span>Dataset</span>
-              <strong>{selectedDataset}</strong>
-              <span>Remembered</span>
-              <strong>{rememberedSourceCount} sources</strong>
-              <span>Last call</span>
-              <strong>{lastLifecycle}</strong>
-            </div>
-          </section>
+        <section className="panel timeline-panel">
+          <div className="panel-heading">
+            <Clock3 size={20} />
+            <h2>Memory Timeline</h2>
+          </div>
+          <div className="timeline">
+            {events.slice(0, 5).map((event) => (
+              <article className="timeline-item" key={event.id}>
+                <div>
+                  <span className="badge">{event.lifecycle}</span>
+                  <span className="source">{event.source}</span>
+                </div>
+                <strong>{event.title}</strong>
+                <p>{event.detail}</p>
+              </article>
+            ))}
+            {events.length === 0 ? <p className="muted">Lifecycle events will appear here.</p> : null}
+          </div>
+        </section>
+      </section>
 
+      <section className="recall-feed-grid">
+        <form className="panel recall" onSubmit={handleRecall}>
+          <h2>Ask Cognee</h2>
+          <div className="prompt-row">
+            {judgePrompts.map((prompt) => (
+              <button className="secondary" key={prompt} onClick={() => setQuery(prompt)} type="button">
+                <ListChecks size={16} />
+                {prompt}
+              </button>
+            ))}
+          </div>
+          <div className="query-row">
+            <input value={query} onChange={(event) => setQuery(event.target.value)} />
+            <button disabled={busy || !selectedId} type="submit">
+              <Search size={18} />
+              Ask
+            </button>
+          </div>
+        </form>
+
+        <section className="feed">
+          {feed.map((item, index) => (
+            <article className={`feed-item ${item.kind}`} key={`${item.title}-${index}`}>
+              <div className="feed-icon">
+                {item.kind === "answer" ? <MessageSquareText size={18} /> : <Brain size={18} />}
+              </div>
+              <div>
+                <div className="feed-meta">
+                  <span className="source">{item.source}</span>
+                  {item.related ? <span>{item.related}</span> : null}
+                </div>
+                <h3>{item.title}</h3>
+                <p>{item.body}</p>
+              </div>
+            </article>
+          ))}
+          {feed.length === 0 ? (
+            <article className="empty-state">
+              <Brain size={28} />
+              <p>Run the demo, ask what happened yesterday, then watch Cognee recall the session context.</p>
+            </article>
+          ) : null}
+        </section>
+      </section>
+
+      <section className="builder-grid">
+        <form className="panel session-panel" onSubmit={handleRememberSession}>
+          <div className="panel-heading">
+            <Code2 size={20} />
+            <h2>Codex Session Memory</h2>
+          </div>
+          <label>
+            Session summary
+            <textarea value={session.summary} onChange={(event) => updateSession("summary", event.target.value)} />
+          </label>
+          <div className="two-col">
+            <label>
+              Files changed
+              <textarea value={session.files_changed} onChange={(event) => updateSession("files_changed", event.target.value)} />
+            </label>
+            <label>
+              Commands run
+              <textarea value={session.commands_run} onChange={(event) => updateSession("commands_run", event.target.value)} />
+            </label>
+          </div>
+          <div className="two-col">
+            <label>
+              Decisions
+              <textarea value={session.decisions} onChange={(event) => updateSession("decisions", event.target.value)} />
+            </label>
+            <label>
+              Blockers
+              <textarea value={session.blockers} onChange={(event) => updateSession("blockers", event.target.value)} />
+            </label>
+          </div>
+          <label>
+            Next tasks
+            <textarea value={session.next_tasks} onChange={(event) => updateSession("next_tasks", event.target.value)} />
+          </label>
+          <button disabled={busy || !selectedId} type="submit">
+            <ShieldCheck size={18} />
+            Remember Session
+          </button>
+        </form>
+
+        <section className="builder-stack">
+          <form className="panel" onSubmit={handleRememberText}>
+            <h2>Remember Note</h2>
+            <label>
+              Title
+              <input value={title} onChange={(event) => setTitle(event.target.value)} />
+            </label>
+            <label>
+              Text, notes, decisions, logs
+              <textarea value={content} onChange={(event) => setContent(event.target.value)} />
+            </label>
+            <button disabled={busy || !selectedId} type="submit">
+              <Brain size={18} />
+              Store Memory
+            </button>
+          </form>
+
+          <div className="asset-grid">
+            <form className="panel" onSubmit={handleRememberUrl}>
+              <h2>Ingest URL</h2>
+              <label>
+                URL
+                <input placeholder="https://..." value={url} onChange={(event) => setUrl(event.target.value)} />
+              </label>
+              <button disabled={busy || !selectedId || !url} type="submit">
+                <Link size={18} />
+                Remember URL
+              </button>
+            </form>
+
+            <section className="panel">
+              <h2>Upload File</h2>
+              <label className="file-drop">
+                <FileUp size={22} />
+                <span>PDFs, docs, notes, logs</span>
+                <input onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)} type="file" />
+              </label>
+            </section>
+          </div>
+        </section>
+
+        <aside className="builder-stack">
           <form className="panel" onSubmit={handleCreateProject}>
             <h2>Project Brain</h2>
             <label>
@@ -362,14 +620,10 @@ function App() {
               {projects.length === 0 ? <p className="muted">No project yet.</p> : null}
             </div>
           </section>
-        </aside>
 
-        <section className="main-grid">
-          <div className="topbar">
-            <div>
-              <span className="eyebrow">Selected Memory</span>
-              <h2>{selectedProject?.name ?? "Create a project to begin"}</h2>
-            </div>
+          <section className="panel selected-card">
+            <span className="eyebrow">Selected Memory</span>
+            <h2>{selectedProject?.name ?? "Create a project to begin"}</h2>
             <div className="actions">
               <button disabled={busy || !selectedId} onClick={handleImprove} type="button">
                 <RefreshCcw size={18} />
@@ -380,165 +634,8 @@ function App() {
                 Forget
               </button>
             </div>
-          </div>
-
-          <section className="focus-grid">
-            <form className="panel session-panel" onSubmit={handleRememberSession}>
-              <div className="panel-heading">
-                <Code2 size={20} />
-                <h2>Codex Session Memory</h2>
-              </div>
-              <label>
-                Session summary
-                <textarea value={session.summary} onChange={(event) => updateSession("summary", event.target.value)} />
-              </label>
-              <div className="two-col">
-                <label>
-                  Files changed
-                  <textarea
-                    value={session.files_changed}
-                    onChange={(event) => updateSession("files_changed", event.target.value)}
-                  />
-                </label>
-                <label>
-                  Commands run
-                  <textarea
-                    value={session.commands_run}
-                    onChange={(event) => updateSession("commands_run", event.target.value)}
-                  />
-                </label>
-              </div>
-              <div className="two-col">
-                <label>
-                  Decisions
-                  <textarea value={session.decisions} onChange={(event) => updateSession("decisions", event.target.value)} />
-                </label>
-                <label>
-                  Blockers
-                  <textarea value={session.blockers} onChange={(event) => updateSession("blockers", event.target.value)} />
-                </label>
-              </div>
-              <label>
-                Next tasks
-                <textarea value={session.next_tasks} onChange={(event) => updateSession("next_tasks", event.target.value)} />
-              </label>
-              <button disabled={busy || !selectedId} type="submit">
-                <ShieldCheck size={18} />
-                Remember Session
-              </button>
-            </form>
-
-            <section className="panel timeline-panel">
-              <div className="panel-heading">
-                <Clock3 size={20} />
-                <h2>Memory Timeline</h2>
-              </div>
-              <div className="timeline">
-                {events.slice(0, 12).map((event) => (
-                  <article className="timeline-item" key={event.id}>
-                    <div>
-                      <span className="badge">{event.lifecycle}</span>
-                      <span className="source">{event.source}</span>
-                    </div>
-                    <strong>{event.title}</strong>
-                    <p>{event.detail}</p>
-                  </article>
-                ))}
-                {events.length === 0 ? <p className="muted">Lifecycle events will appear here.</p> : null}
-              </div>
-            </section>
           </section>
-
-          <section className="memory-grid">
-            <form className="panel tall" onSubmit={handleRememberText}>
-              <h2>Remember Note</h2>
-              <label>
-                Title
-                <input value={title} onChange={(event) => setTitle(event.target.value)} />
-              </label>
-              <label className="grow">
-                Text, notes, decisions, logs
-                <textarea value={content} onChange={(event) => setContent(event.target.value)} />
-              </label>
-              <button disabled={busy || !selectedId} type="submit">
-                <Brain size={18} />
-                Store Memory
-              </button>
-            </form>
-
-            <div className="stack">
-              <form className="panel" onSubmit={handleRememberUrl}>
-                <h2>Ingest URL</h2>
-                <label>
-                  URL
-                  <input placeholder="https://..." value={url} onChange={(event) => setUrl(event.target.value)} />
-                </label>
-                <button disabled={busy || !selectedId || !url} type="submit">
-                  <Link size={18} />
-                  Remember URL
-                </button>
-              </form>
-
-              <section className="panel">
-                <h2>Upload File</h2>
-                <label className="file-drop">
-                  <FileUp size={22} />
-                  <span>PDFs, docs, notes, logs</span>
-                  <input onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)} type="file" />
-                </label>
-              </section>
-            </div>
-          </section>
-
-          <section className="recall-row">
-            <form className="panel recall" onSubmit={handleRecall}>
-              <h2>Recall</h2>
-              <div className="prompt-row">
-                {judgePrompts.map((prompt) => (
-                  <button className="secondary" key={prompt} onClick={() => setQuery(prompt)} type="button">
-                    <ListChecks size={16} />
-                    {prompt}
-                  </button>
-                ))}
-              </div>
-              <div className="query-row">
-                <input value={query} onChange={(event) => setQuery(event.target.value)} />
-                <button disabled={busy || !selectedId} type="submit">
-                  <Search size={18} />
-                  Ask
-                </button>
-              </div>
-              <button className="secondary" disabled={busy || !selectedId} onClick={handleMorningBrief} type="button">
-                <Lightbulb size={18} />
-                Morning Brief
-              </button>
-            </form>
-          </section>
-
-          <section className="feed">
-            {feed.map((item, index) => (
-              <article className={`feed-item ${item.kind}`} key={`${item.title}-${index}`}>
-                <div className="feed-icon">
-                  {item.kind === "answer" ? <MessageSquareText size={18} /> : <Brain size={18} />}
-                </div>
-                <div>
-                  <div className="feed-meta">
-                    <span className="source">{item.source}</span>
-                    {item.related ? <span>{item.related}</span> : null}
-                  </div>
-                  <h3>{item.title}</h3>
-                  <p>{item.body}</p>
-                </div>
-              </article>
-            ))}
-            {feed.length === 0 ? (
-              <article className="empty-state">
-                <Brain size={28} />
-                <p>Run the demo, ask what happened yesterday, then watch Cognee recall the session context.</p>
-              </article>
-            ) : null}
-          </section>
-        </section>
+        </aside>
       </section>
     </main>
   );
