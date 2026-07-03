@@ -2,6 +2,8 @@
 
 A hackathon MVP for agents that should not wake up with amnesia. The app uses Cognee as a permanent graph-vector memory layer so a project assistant can remember notes, files, URLs, decisions, blockers, and next actions across sessions.
 
+**Hackathon track:** Best Use of Cognee Cloud.
+
 ## Why this wins the theme
 
 The product makes Cognee's memory lifecycle the core user workflow:
@@ -112,4 +114,4 @@ Open `http://127.0.0.1:5173`.
 
 - Rotate any exposed Cognee API key before submitting publicly.
 - The app declares AI assistant usage in `SUBMISSION.md`, as required by the hackathon rules.
-- Use the screenshot and demo script above for the submission page.
+- Use the screenshot and `SUBMISSION.md` summary for the submission page.
