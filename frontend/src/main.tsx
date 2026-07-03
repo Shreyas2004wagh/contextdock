@@ -113,6 +113,29 @@ function App() {
     return Object.entries(counts);
   }, [events]);
 
+  const lifecycleCounts = useMemo(() => {
+    return events.reduce<Record<string, number>>((summary, event) => {
+      summary[event.lifecycle] = (summary[event.lifecycle] ?? 0) + 1;
+      return summary;
+    }, {});
+  }, [events]);
+
+  const memoryGraphNodes = useMemo(() => {
+    const remembered = sourceSummary.map(([source, count]) => ({
+      label: source,
+      meta: `${count} source${count === 1 ? "" : "s"}`,
+      type: "source",
+    }));
+    const lifecycle = lifecycleSteps
+      .map((step) => ({
+        label: step.name,
+        meta: `${lifecycleCounts[step.name] ?? 0} calls`,
+        type: "lifecycle",
+      }))
+      .filter((node) => node.meta !== "0 calls");
+    return [...remembered, ...lifecycle].slice(0, 8);
+  }, [lifecycleCounts, sourceSummary]);
+
   const lastLifecycle = events[0]?.lifecycle ?? "waiting";
   const selectedDataset = selectedId ? `project-${selectedId}` : "No dataset selected";
   const latestAnswer = feed.find((item) => item.kind === "answer");
@@ -347,6 +370,11 @@ function App() {
             Where's My Context? turns project notes, files, URLs, and Codex sessions into persistent memory so the next
             work session starts with decisions, blockers, files, and next actions already recovered.
           </p>
+          <div className="status-strip" aria-label="Demo execution status">
+            <span className={lastLifecycle === "waiting" ? "" : "active"}>{lastLifecycle}</span>
+            <span>{health?.memory_mode === "cloud" ? "Cognee Cloud online" : "Local memory mode"}</span>
+            <span>{rememberedSourceCount} remembered sources</span>
+          </div>
           <div className="hero-actions">
             <button className="demo-button" disabled={busy} onClick={handleRunDemo} type="button">
               <Play size={18} />
@@ -425,6 +453,28 @@ function App() {
               <span className="source">no sources yet</span>
             )}
           </div>
+          <div className="memory-map" aria-label="Memory graph preview">
+            <div className="graph-core">
+              <Brain size={20} />
+              <strong>Cognee</strong>
+              <span>{health?.memory_mode === "cloud" ? "Cloud graph" : "Local graph"}</span>
+            </div>
+            <div className="graph-nodes">
+              {memoryGraphNodes.length ? (
+                memoryGraphNodes.map((node) => (
+                  <span className={`graph-node ${node.type}`} key={`${node.type}-${node.label}`}>
+                    <strong>{node.label}</strong>
+                    <small>{node.meta}</small>
+                  </span>
+                ))
+              ) : (
+                <span className="graph-node empty">
+                  <strong>waiting</strong>
+                  <small>run demo to draw proof</small>
+                </span>
+              )}
+            </div>
+          </div>
         </section>
 
         <section className="panel lifecycle">
@@ -433,6 +483,7 @@ function App() {
             {lifecycleSteps.map((step) => (
               <div className="lifecycle-step" key={step.name}>
                 <span>{step.name}</span>
+                <strong>{lifecycleCounts[step.name] ?? 0}</strong>
                 <p>{step.detail}</p>
               </div>
             ))}
