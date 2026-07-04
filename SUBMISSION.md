@@ -49,6 +49,14 @@ The demo is not a generic chat app with saved messages. It is a builder-focused 
 
 This project was built with help from AI coding assistants, including OpenAI Codex, for planning, implementation, UI iteration, documentation, and validation. The project concept, product direction, testing decisions, and final submission choices were directed by the human participant.
 
+## Final Submission Checklist
+
+- Repository: https://github.com/Shreyas2004wagh/cogneeProject
+- Local run: start the FastAPI backend on `127.0.0.1:8000`, then start the Vite frontend on `127.0.0.1:5173`.
+- Demo recording: open the app, confirm the Memory Proof panel says `Cognee Cloud`, click **Fresh Demo Project**, click **Run Demo**, then show the Morning Brief, lifecycle chips, and Memory Timeline.
+- Safety: rotate the Cognee API key before public submission because it was shared during testing.
+- Disclosure: include the AI assistant disclosure above in the submission form.
+
 ## Roadmap
 
 - Source-backed answer citations from Cognee recall results when available.
