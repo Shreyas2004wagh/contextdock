@@ -162,7 +162,7 @@ async def recall(payload: RecallRequest) -> dict:
     try:
         ensure_project(payload.project_id)
         answer = await cognee_memory.recall(payload.project_id, payload.query)
-        log_event(payload.project_id, "recall()", "query", payload.query, answer[:280])
+        log_event(payload.project_id, "recall()", "query", payload.query, answer[:1200])
     except KeyError:
         raise HTTPException(status_code=404, detail="Project not found") from None
     except Exception as exc:
