@@ -136,6 +136,19 @@ function App() {
     return [...remembered, ...lifecycle].slice(0, 8);
   }, [lifecycleCounts, sourceSummary]);
 
+  const timelineEvents = useMemo(() => {
+    const requiredLifecycle = ["recall()", "improve()", "remember()"];
+    const selected = [...events.slice(0, 5)];
+    for (const lifecycle of requiredLifecycle) {
+      const hasLifecycle = selected.some((event) => event.lifecycle === lifecycle);
+      const event = events.find((item) => item.lifecycle === lifecycle);
+      if (!hasLifecycle && event) {
+        selected.push(event);
+      }
+    }
+    return Array.from(new Map(selected.map((event) => [event.id, event])).values()).slice(0, 8);
+  }, [events]);
+
   const lastLifecycle = events[0]?.lifecycle ?? "waiting";
   const selectedDataset = selectedId ? `project-${selectedId}` : "No dataset selected";
   const latestAnswer = feed.find((item) => item.kind === "answer");
@@ -147,7 +160,10 @@ function App() {
     getProjects()
       .then((items) => {
         setProjects(items);
-        setSelectedId(items[0]?.id ?? "");
+        const newestProject = [...items].sort((left, right) =>
+          right.updated_at.localeCompare(left.updated_at),
+        )[0];
+        setSelectedId(newestProject?.id ?? "");
       })
       .catch((error) => push("system", "system", "Backend not ready", error.message));
   }, []);
@@ -155,18 +171,25 @@ function App() {
   useEffect(() => {
     if (!selectedId) {
       setEvents([]);
+      setMorningBriefAnswer("");
       return;
     }
-    loadEvents(selectedId);
+    loadEvents(selectedId, true);
   }, [selectedId]);
 
   function push(kind: FeedItem["kind"], source: string, titleText: string, body: string, related?: string) {
     setFeed((items) => [{ kind, source, title: titleText, body, related }, ...items].slice(0, 16));
   }
 
-  async function loadEvents(projectId: string) {
+  async function loadEvents(projectId: string, syncMorningBrief = false) {
     const items = await getProjectEvents(projectId);
     setEvents(items);
+    if (syncMorningBrief) {
+      const briefEvent = items.find(
+        (event) => event.lifecycle === "recall()" && event.title === morningPrompt,
+      );
+      setMorningBriefAnswer(briefEvent?.detail ?? "");
+    }
   }
 
   async function refreshEvents(projectId = selectedId) {
@@ -496,7 +519,7 @@ function App() {
             <h2>Memory Timeline</h2>
           </div>
           <div className="timeline">
-            {events.slice(0, 5).map((event) => (
+            {timelineEvents.map((event) => (
               <article className="timeline-item" key={event.id}>
                 <div>
                   <span className="badge">{event.lifecycle}</span>
