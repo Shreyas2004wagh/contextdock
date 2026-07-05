@@ -1,9 +1,12 @@
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8000";
 
+export { API_BASE };
+
 export type Project = {
   id: string;
   name: string;
   description: string;
+  owner_id?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -32,8 +35,31 @@ export type Health = {
   memory_mode: "cloud" | "local";
 };
 
+export type AuthProvider = {
+  available: boolean;
+  login_url: string;
+};
+
+export type AuthProviders = {
+  github: AuthProvider;
+  google: AuthProvider;
+};
+
+export type CurrentUser = {
+  id: string;
+  provider: string;
+  email?: string | null;
+  name: string;
+  avatar_url?: string | null;
+};
+
+export type AuthMe = {
+  user: CurrentUser | null;
+};
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
+    credentials: "include",
     headers: options?.body instanceof FormData ? undefined : { "Content-Type": "application/json" },
     ...options,
   });
@@ -46,6 +72,18 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export function getHealth() {
   return request<Health>("/health");
+}
+
+export function getAuthProviders() {
+  return request<AuthProviders>("/auth/providers");
+}
+
+export function getCurrentUser() {
+  return request<AuthMe>("/auth/me");
+}
+
+export function logout() {
+  return request<{ status: string }>("/auth/logout", { method: "POST" });
 }
 
 export function getProjects() {
