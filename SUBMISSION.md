@@ -51,7 +51,7 @@ The demo is not a generic chat app with saved messages. It is a builder-focused 
 
 ## AI Assistant Disclosure
 
-This project was built with help from AI coding assistants, including OpenAI Codex, for planning, implementation, UI iteration, documentation, and validation. The project concept, product direction, testing decisions, and final submission choices were directed by the human participant.
+AI coding assistants were used for limited development support and iteration. The project idea, product direction, implementation choices, and final submission were directed by me.
 
 ## Final Submission Checklist
 
