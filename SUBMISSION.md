@@ -14,7 +14,7 @@ LLMs and coding agents are powerful during a session, but they usually restart c
 
 ## Solution
 
-Where's My Context? gives each project a Cognee-backed memory space. Users can remember notes, URLs, files, and Codex-style coding session summaries, then ask for a morning brief or targeted recall before starting work again.
+Where's My Context? gives each project a Cognee-backed memory space. The product opens as an Agent Memory OS: sign in with GitHub or Google, run a coding-agent memory case, store session context, improve the graph, recall a handoff brief, and show the Cognee Cloud Receipt without leaving the page.
 
 ## Why Cognee Is Core
 
@@ -22,15 +22,19 @@ Where's My Context? gives each project a Cognee-backed memory space. Users can r
 - `recall()` answers questions such as "What was I working on yesterday?" and "What should I fix next?"
 - `improve()` enriches the selected project memory after a work session.
 - `forget()` prunes the selected project memory when a demo or project needs to reset.
-- The app shows a lifecycle rail, Memory Timeline, and Memory Proof panel so judges can see Cognee's role directly.
+- The app shows a lifecycle rail, action trail, source labels, and Cognee Cloud Receipt so Cognee's role is directly visible.
 
 ## Demo Flow
 
-1. Open the app and click **Run Demo**.
-2. Watch it remember a Codex-style coding session and project note.
-3. Show the Memory Timeline entries for `remember()`, `improve()`, and `recall()`.
-4. Ask "What was I working on yesterday?"
-5. Click **Morning Brief** to recover decisions, blockers, files that matter, and next actions.
+1. Open the app and confirm the hero says **Your AI agent remembers every project.**
+2. Show the GitHub and Google sign-in options.
+3. Sign in, then open the authenticated memory workspace.
+4. Click **New Memory Space**.
+5. Click **Try Live Memory Case**.
+6. Watch it remember an agent session and release context note.
+7. Show the action trail entries for `remember()`, `improve()`, and `recall()`.
+8. Show the Handoff Brief with decisions, blockers, files, and next action.
+9. Click **Copy Memory Receipt** in the Cognee Cloud Receipt.
 
 ## What Makes It Different
 
@@ -42,7 +46,7 @@ The demo is not a generic chat app with saved messages. It is a builder-focused 
 - **Creativity & Innovation:** the project turns Codex-style work sessions into persistent project memory, not just chat history.
 - **Technical Excellence:** FastAPI and React connect to Cognee lifecycle APIs with project-scoped datasets and local timeline metadata.
 - **Best Use of Cognee:** `remember()`, `recall()`, `improve()`, and `forget()` are visible, demoable product actions.
-- **User Experience:** the first screen is a judge-ready command center with Run Demo, Morning Brief, Memory Proof, and lifecycle activity.
+- **User Experience:** the first screen is a product landing page with OAuth CTAs; the real memory workspace appears after sign-in.
 - **Presentation Quality:** the README, screenshot, and demo flow all explain the same story: the agent wakes up and Cognee remembers.
 
 ## AI Assistant Disclosure
@@ -53,7 +57,7 @@ This project was built with help from AI coding assistants, including OpenAI Cod
 
 - Repository: https://github.com/Shreyas2004wagh/cogneeProject
 - Local run: start the FastAPI backend on `127.0.0.1:8000`, then start the Vite frontend on `127.0.0.1:5173`.
-- Demo recording: open the app, confirm the Memory Proof panel says `Cognee Cloud`, click **Fresh Demo Project**, click **Run Demo**, then show the Morning Brief, lifecycle chips, and Memory Timeline.
+- Demo recording: open the app, show GitHub/Google sign-in, sign in, confirm the Cognee Cloud Receipt says `Cognee Cloud`, click **New Memory Space**, click **Try Live Memory Case**, then show the Handoff Brief, lifecycle chips, action trail, and copied memory receipt.
 - Safety: rotate the Cognee API key before public submission because it was shared during testing.
 - Disclosure: include the AI assistant disclosure above in the submission form.
 

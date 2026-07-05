@@ -1,6 +1,6 @@
 # Where's My Context?
 
-A hackathon MVP for agents that should not wake up with amnesia. The app uses Cognee as a permanent graph-vector memory layer so a project assistant can remember notes, files, URLs, decisions, blockers, and next actions across sessions.
+An Agent Memory OS for coding agents that should not wake up with amnesia. The app uses Cognee as a permanent graph-vector memory layer so a project assistant can remember notes, files, URLs, decisions, blockers, and next actions across sessions.
 
 **Hackathon track:** Best Use of Cognee Cloud.
 
@@ -26,13 +26,15 @@ Cognee is central because the app does not just save local notes:
 
 ## Demo-ready features
 
-- One-click **Run Demo** path for judges.
+- Real GitHub and Google OAuth sign-in before the workspace opens.
+- Landing-first product flow with the real memory workspace shown after sign-in.
 - Codex-style coding session memory for files changed, commands run, decisions, blockers, and next tasks.
 - Memory timeline that shows the Cognee lifecycle calls made for the selected project.
 - Source labels for remembered notes, URLs, files, coding sessions, and recall answers.
-- Morning brief recall that asks Cognee for yesterday's decisions, blockers, files that matter, and next actions.
-- Memory Proof panel showing provider mode, dataset name, remembered source count, and latest lifecycle call.
-- First-screen command center focused on the winning moment: a coding agent wakes up and Cognee remembers yesterday.
+- Handoff brief recall that asks Cognee for decisions, blockers, files that matter, and next actions.
+- Cognee Cloud Receipt showing provider mode, dataset name, remembered source count, latest lifecycle call, source labels, and copyable memory receipt.
+- Product-story homepage focused on the winning moment: an AI agent remembers every project.
+- Architecture and "how it works" sections that explain React/Vite, FastAPI, Cognee Cloud, local timeline metadata, Vercel, and Render.
 
 ## Judging criteria fit
 
@@ -40,7 +42,7 @@ Cognee is central because the app does not just save local notes:
 - **Creativity & Innovation:** Codex-style coding sessions become persistent memory, not throwaway chat logs.
 - **Technical Excellence:** FastAPI + React expose project-scoped Cognee lifecycle workflows.
 - **Best Use of Cognee:** `remember()`, `recall()`, `improve()`, and `forget()` are all visible product actions.
-- **User Experience:** Run Demo, Morning Brief, Memory Proof, and timeline appear before the editing forms.
+- **User Experience:** OAuth CTAs and product story appear first; after sign-in, Try Live Memory Case, Handoff Brief, Cognee Cloud Receipt, lifecycle activity, and timeline appear before editing forms.
 - **Presentation Quality:** the app, README, screenshot, and submission notes tell the same memory story.
 
 ## Screenshot
@@ -52,17 +54,21 @@ Cognee is central because the app does not just save local notes:
 | Product action | Cognee lifecycle | Backend route |
 | --- | --- | --- |
 | Remember note, URL, file, or session | `remember()` | `/memory/remember/*` |
-| Ask a question or morning brief | `recall()` | `/memory/recall` |
+| Ask a question or handoff brief | `recall()` | `/memory/recall` |
 | Enrich project memory after work | `improve()` / `cognify` | `/memory/improve` |
 | Prune selected project memory | `forget()` | `/memory/forget` |
+| Sign in with GitHub or Google | app auth | `/auth/*` |
 
 ## App flow
 
 1. Create a project memory space.
-2. Paste context from yesterday, upload a file, ingest a URL, or remember a Codex coding session.
-3. Ask questions like "What was I working on yesterday?" or "What files matter?"
-4. Generate a morning brief from remembered decisions, blockers, files, and next actions.
-5. Improve or forget the selected project memory when needed.
+2. Sign in with GitHub or Google.
+3. Open the authenticated workspace.
+4. Click **Try Live Memory Case** to store an agent session, remember a note, improve the graph, and recall product prompts.
+5. Show the Handoff Brief artifact and Cognee Cloud Receipt.
+6. Ask questions like "What changed in the last agent session?" or "Which files matter?"
+7. Use the builder controls to paste context, upload a file, ingest a URL, or remember a custom coding session.
+8. Improve or forget the selected project memory when needed.
 
 ## Setup
 
@@ -79,9 +85,18 @@ Fill `.env` with Cognee Platform variables:
 COGNEE_API_BASE_URL=https://tenant-xxxx.aws.cognee.ai
 COGNEE_API_KEY=your-platform-key
 COGNEE_TENANT_ID=your-tenant-id
+SESSION_SECRET=generate-a-long-random-secret
+FRONTEND_URL=http://127.0.0.1:5173
+OAUTH_REDIRECT_BASE_URL=http://127.0.0.1:8000
+GITHUB_CLIENT_ID=your-github-client-id
+GITHUB_CLIENT_SECRET=your-github-client-secret
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
 ```
 
 `.env` is ignored by git. Do not put the API key in frontend code.
+
+For Vercel + Render, set `FRONTEND_URL=https://cognee-project.vercel.app`, `OAUTH_REDIRECT_BASE_URL=https://cogneeproject.onrender.com`, `SESSION_COOKIE_SAMESITE=none`, and `SESSION_COOKIE_SECURE=true`.
 
 If an API key was ever shared in chat, screenshots, or a recording, rotate it before submitting publicly.
 
@@ -114,4 +129,4 @@ Open `http://127.0.0.1:5173`.
 
 - Rotate any exposed Cognee API key before submitting publicly.
 - The app declares AI assistant usage in `SUBMISSION.md`, as required by the hackathon rules.
-- Use the screenshot and `SUBMISSION.md` summary for the submission page.
+- Use the screenshot, Cognee Cloud Receipt, and `SUBMISSION.md` summary for the submission page.
