@@ -11,6 +11,7 @@ from typing import Any
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 PROJECTS_FILE = DATA_DIR / "projects.json"
 EVENTS_FILE = DATA_DIR / "events.json"
+USERS_FILE = DATA_DIR / "users.json"
 
 
 def _slugify(value: str) -> str:
@@ -42,11 +43,30 @@ def _save_events(events: list[dict[str, Any]]) -> None:
     EVENTS_FILE.write_text(json.dumps(events, indent=2), encoding="utf-8")
 
 
-def list_projects() -> list[dict[str, Any]]:
-    return _load_projects()
+def _load_users() -> list[dict[str, Any]]:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    if not USERS_FILE.exists():
+        return []
+    return json.loads(USERS_FILE.read_text(encoding="utf-8"))
 
 
-def create_project(name: str, description: str = "") -> dict[str, Any]:
+def _save_users(users: list[dict[str, Any]]) -> None:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    USERS_FILE.write_text(json.dumps(users, indent=2), encoding="utf-8")
+
+
+def list_projects(owner_id: str | None = None) -> list[dict[str, Any]]:
+    projects = _load_projects()
+    if owner_id is None:
+        return [project for project in projects if not project.get("owner_id")]
+    return [
+        project
+        for project in projects
+        if project.get("owner_id") in {owner_id, None}
+    ]
+
+
+def create_project(name: str, description: str = "", owner_id: str | None = None) -> dict[str, Any]:
     projects = _load_projects()
     base_id = _slugify(name)
     project_id = base_id
@@ -61,6 +81,7 @@ def create_project(name: str, description: str = "") -> dict[str, Any]:
         "id": project_id,
         "name": name.strip(),
         "description": description.strip(),
+        "owner_id": owner_id,
         "created_at": now,
         "updated_at": now,
     }
@@ -85,9 +106,15 @@ def touch_project(project_id: str) -> None:
             return
 
 
-def ensure_project(project_id: str) -> None:
-    if not any(project["id"] == project_id for project in _load_projects()):
-        raise KeyError(project_id)
+def ensure_project(project_id: str, owner_id: str | None = None) -> None:
+    for project in _load_projects():
+        if project["id"] != project_id:
+            continue
+        project_owner_id = project.get("owner_id")
+        if project_owner_id and owner_id != project_owner_id:
+            raise KeyError(project_id)
+        return
+    raise KeyError(project_id)
 
 
 def log_event(project_id: str, lifecycle: str, source: str, title: str, detail: str = "") -> dict[str, Any]:
@@ -107,7 +134,65 @@ def log_event(project_id: str, lifecycle: str, source: str, title: str, detail: 
     return event
 
 
-def list_project_events(project_id: str) -> list[dict[str, Any]]:
-    ensure_project(project_id)
+def list_project_events(project_id: str, owner_id: str | None = None) -> list[dict[str, Any]]:
+    ensure_project(project_id, owner_id)
     events = [event for event in _load_events() if event.get("project_id") == project_id]
     return sorted(events, key=lambda event: event.get("created_at", ""), reverse=True)
+
+
+def get_user(user_id: str | None) -> dict[str, Any] | None:
+    if not user_id:
+        return None
+    return next((user for user in _load_users() if user["id"] == user_id), None)
+
+
+def public_user(user: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not user:
+        return None
+    return {
+        "id": user["id"],
+        "provider": user["provider"],
+        "email": user.get("email"),
+        "name": user.get("name") or user.get("email") or "Signed-in user",
+        "avatar_url": user.get("avatar_url"),
+    }
+
+
+def upsert_user(profile: dict[str, Any]) -> dict[str, Any]:
+    users = _load_users()
+    now = datetime.now(timezone.utc).isoformat()
+    existing = next(
+        (
+            user
+            for user in users
+            if user["provider"] == profile["provider"]
+            and user["provider_user_id"] == profile["provider_user_id"]
+        ),
+        None,
+    )
+
+    if existing:
+        existing.update(
+            {
+                "email": profile.get("email") or existing.get("email"),
+                "name": profile.get("name") or existing.get("name"),
+                "avatar_url": profile.get("avatar_url") or existing.get("avatar_url"),
+                "updated_at": now,
+            }
+        )
+        _save_users(users)
+        return existing
+
+    user = {
+        "id": uuid4().hex,
+        "provider": profile["provider"],
+        "provider_user_id": profile["provider_user_id"],
+        "email": profile.get("email"),
+        "name": profile.get("name"),
+        "avatar_url": profile.get("avatar_url"),
+        "created_at": now,
+        "updated_at": now,
+    }
+    users.append(user)
+    _save_users(users)
+    return user
