@@ -506,6 +506,10 @@ function App() {
     return `${API_BASE}${authProviders?.[provider]?.login_url ?? `/auth/${provider}/login`}`;
   }
 
+  function devLoginUrl() {
+    return `${API_BASE}${authProviders?.dev?.login_url ?? "/auth/dev/login"}`;
+  }
+
   function handleLogout() {
     withBusy(async () => {
       await logout();
@@ -556,6 +560,12 @@ function App() {
                 <Sparkles size={16} />
                 Continue with Google
               </a>
+              {authProviders?.dev?.available ? (
+                <a className="nav-button secondary-link" href={devLoginUrl()}>
+                  <Brain size={16} />
+                  Continue as Demo User
+                </a>
+              ) : null}
             </>
           )}
           <a className="nav-button primary-link" href={isSignedIn ? "#live-case" : "#signin"}>
@@ -592,6 +602,12 @@ function App() {
                   <Sparkles size={18} />
                   Continue with Google
                 </a>
+                {authProviders?.dev?.available ? (
+                  <a className="ghost-button auth-cta" href={devLoginUrl()}>
+                    <Brain size={18} />
+                    Continue as Demo User
+                  </a>
+                ) : null}
               </>
             ) : null}
             {isSignedIn ? (
@@ -1083,6 +1099,12 @@ function App() {
                 <Sparkles size={18} />
                 Continue with Google
               </a>
+              {authProviders?.dev?.available ? (
+                <a className="ghost-button auth-cta" href={devLoginUrl()}>
+                  <Brain size={18} />
+                  Continue as Demo User
+                </a>
+              ) : null}
               {authProviders && (!authProviders.github.available || !authProviders.google.available) ? (
                 <p className="muted">OAuth provider credentials are not configured on this backend yet.</p>
               ) : null}

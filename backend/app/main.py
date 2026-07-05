@@ -102,6 +102,11 @@ async def auth_google_callback(request: Request, code: str | None = None, state:
     return await auth.google_callback(request, code, state)
 
 
+@app.get("/auth/dev/login")
+async def auth_dev_login(request: Request):
+    return auth.dev_login(request)
+
+
 @app.get("/auth/me")
 async def auth_me(request: Request) -> dict:
     return auth.public_current_user(request, get_user(auth.current_user_id(request)))

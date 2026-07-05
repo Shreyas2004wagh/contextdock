@@ -43,6 +43,7 @@ export type AuthProvider = {
 export type AuthProviders = {
   github: AuthProvider;
   google: AuthProvider;
+  dev?: AuthProvider;
 };
 
 export type CurrentUser = {

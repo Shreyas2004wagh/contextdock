@@ -29,6 +29,10 @@ def auth_providers() -> dict[str, dict[str, bool | str]]:
             "available": bool(os.getenv("GOOGLE_CLIENT_ID") and os.getenv("GOOGLE_CLIENT_SECRET")),
             "login_url": "/auth/google/login",
         },
+        "dev": {
+            "available": os.getenv("DEV_AUTH_ENABLED", "false").lower() == "true",
+            "login_url": "/auth/dev/login",
+        },
     }
 
 
@@ -65,6 +69,21 @@ def _finish_login(request: Request, profile: dict[str, str | None]) -> RedirectR
     request.session.pop("oauth_provider", None)
     request.session["user_id"] = user["id"]
     return RedirectResponse(f"{frontend_url()}/#live-case")
+
+
+def dev_login(request: Request) -> RedirectResponse:
+    if not auth_providers()["dev"]["available"]:
+        raise HTTPException(status_code=404, detail="Development sign-in is disabled.")
+    return _finish_login(
+        request,
+        {
+            "provider": "dev",
+            "provider_user_id": "local-demo-user",
+            "email": "demo@wheresmycontext.dev",
+            "name": "Demo User",
+            "avatar_url": None,
+        },
+    )
 
 
 def github_login(request: Request) -> RedirectResponse:
