@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import os
-from secrets import token_urlsafe
+import time
+from secrets import compare_digest, token_urlsafe
 from urllib.parse import urlencode
 
 import httpx
 from fastapi import HTTPException, Request
 from starlette.responses import RedirectResponse
 
-from .store import public_user, upsert_user
+from .store import allow_guest_projects, get_user, public_user, upsert_user
 
 
 def frontend_url() -> str:
@@ -37,7 +38,13 @@ def auth_providers() -> dict[str, dict[str, bool | str]]:
 
 
 def current_user_id(request: Request) -> str | None:
-    return request.session.get("user_id")
+    user = get_user(request.session.get("user_id"))
+    return user["id"] if user else None
+
+
+def require_access(request: Request) -> None:
+    if not current_user_id(request) and not allow_guest_projects():
+        raise HTTPException(status_code=401, detail="Sign in to use project memory.")
 
 
 def clear_session(request: Request) -> None:
@@ -53,14 +60,20 @@ def _state_for(request: Request, provider: str) -> str:
     state = token_urlsafe(24)
     request.session["oauth_state"] = state
     request.session["oauth_provider"] = provider
+    request.session["oauth_issued_at"] = time.time()
     return state
 
 
 def _validate_state(request: Request, provider: str, state: str | None) -> None:
     if not state:
         raise HTTPException(status_code=400, detail="Missing OAuth state.")
-    if request.session.get("oauth_state") != state or request.session.get("oauth_provider") != provider:
+    expected = request.session.get("oauth_state", "")
+    age = time.time() - request.session.get("oauth_issued_at", 0)
+    if not compare_digest(expected, state) or request.session.get("oauth_provider") != provider or not 0 <= age <= 600:
         raise HTTPException(status_code=400, detail="Invalid OAuth state.")
+    request.session.pop("oauth_state", None)
+    request.session.pop("oauth_provider", None)
+    request.session.pop("oauth_issued_at", None)
 
 
 def _finish_login(request: Request, profile: dict[str, str | None]) -> RedirectResponse:
@@ -201,3 +214,11 @@ async def google_callback(request: Request, code: str | None, state: str | None)
 
 def public_current_user(request: Request, user: dict | None) -> dict[str, object]:
     return {"user": public_user(user)}
+
+
+async def complete_callback(provider: str, request: Request, code: str | None, state: str | None):
+    callback = github_callback if provider == "github" else google_callback
+    try:
+        return await callback(request, code, state)
+    except (httpx.HTTPError, ValueError, KeyError):
+        raise HTTPException(status_code=502, detail="Sign-in provider could not complete authentication. Please start sign-in again.") from None

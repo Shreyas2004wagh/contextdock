@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -39,22 +40,36 @@ from .models import (
     RememberTextRequest,
     RememberUrlRequest,
 )
-from .store import create_project, ensure_project, get_user, list_project_events, list_projects, log_event, touch_project
+from .store import clear_project_events, create_project, ensure_project, get_user, initialize_store, list_project_events, list_projects, log_event, touch_project, metadata_store
+from .security import ALLOWED_UPLOAD_EXTENSIONS, MAX_UPLOAD_BYTES, RequestLimitsMiddleware, session_secret
 
 
-app = FastAPI(title="Where's My Context API")
+@asynccontextmanager
+async def lifespan(app):
+    initialize_store()
+    yield
 
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=os.getenv("SESSION_SECRET", "dev-session-secret-change-me"),
-    same_site=os.getenv("SESSION_COOKIE_SAMESITE", "lax"),
-    https_only=os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true",
-)
+
+app = FastAPI(title="Where's My Context API", lifespan=lifespan)
+
+
+def memory_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, HTTPException):
+        return exc
+    if isinstance(exc, ValueError):
+        return HTTPException(status_code=422, detail=str(exc))
+    if isinstance(exc, cognee_memory.CloudMemoryError):
+        if exc.status_code == 429:
+            return HTTPException(status_code=503, detail="Cognee Cloud is rate-limited. Try again later.", headers={"Retry-After": "60"})
+        if exc.status_code in {401, 403}:
+            return HTTPException(status_code=503, detail="Cognee Cloud rejected the configured credentials.")
+    return HTTPException(status_code=502, detail="The memory service could not complete this request. Please try again later.")
 
 frontend_origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "https://cognee-project.vercel.app",
+    auth.frontend_url(),
 ]
 extra_frontend_origins = [
     origin.strip()
@@ -62,6 +77,14 @@ extra_frontend_origins = [
     if origin.strip()
 ]
 
+app.add_middleware(RequestLimitsMiddleware, allowed_origins=[*frontend_origins, *extra_frontend_origins])
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=session_secret(),
+    same_site=os.getenv("SESSION_COOKIE_SAMESITE", "lax"),
+    https_only=os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true",
+    max_age=7 * 24 * 60 * 60,
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[*frontend_origins, *extra_frontend_origins],
@@ -74,7 +97,7 @@ app.add_middleware(
 @app.get("/health")
 async def health() -> dict[str, str]:
     memory_mode = "cloud" if os.getenv("COGNEE_API_BASE_URL") and os.getenv("COGNEE_API_KEY") else "local"
-    return {"status": "ok", "memory_mode": memory_mode}
+    return {"status": "ok", "memory_mode": memory_mode, "memory_connectivity": "not_checked", "metadata_store": metadata_store()}
 
 
 @app.get("/auth/providers")
@@ -89,7 +112,7 @@ async def auth_github_login(request: Request):
 
 @app.get("/auth/github/callback")
 async def auth_github_callback(request: Request, code: str | None = None, state: str | None = None):
-    return await auth.github_callback(request, code, state)
+    return await auth.complete_callback("github", request, code, state)
 
 
 @app.get("/auth/google/login")
@@ -99,7 +122,7 @@ async def auth_google_login(request: Request):
 
 @app.get("/auth/google/callback")
 async def auth_google_callback(request: Request, code: str | None = None, state: str | None = None):
-    return await auth.google_callback(request, code, state)
+    return await auth.complete_callback("google", request, code, state)
 
 
 @app.get("/auth/dev/login")
@@ -123,7 +146,7 @@ async def projects(request: Request) -> list[dict]:
     return list_projects(auth.current_user_id(request))
 
 
-@app.get("/projects/{project_id}/events")
+@app.get("/projects/{project_id}/events", dependencies=[Depends(auth.require_access)])
 async def project_events(request: Request, project_id: str) -> list[dict]:
     try:
         return list_project_events(project_id, auth.current_user_id(request))
@@ -131,12 +154,12 @@ async def project_events(request: Request, project_id: str) -> list[dict]:
         raise HTTPException(status_code=404, detail="Project not found") from None
 
 
-@app.post("/projects")
+@app.post("/projects", dependencies=[Depends(auth.require_access)])
 async def add_project(request: Request, payload: ProjectCreate) -> dict:
     return create_project(payload.name, payload.description, auth.current_user_id(request))
 
 
-@app.post("/memory/remember/text")
+@app.post("/memory/remember/text", dependencies=[Depends(auth.require_access)])
 async def remember_text(request: Request, payload: RememberTextRequest) -> dict:
     try:
         ensure_project(payload.project_id, auth.current_user_id(request))
@@ -146,11 +169,11 @@ async def remember_text(request: Request, payload: RememberTextRequest) -> dict:
     except KeyError:
         raise HTTPException(status_code=404, detail="Project not found") from None
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise memory_error(exc) from exc
     return {"status": "remembered"}
 
 
-@app.post("/memory/remember/url")
+@app.post("/memory/remember/url", dependencies=[Depends(auth.require_access)])
 async def remember_url(request: Request, payload: RememberUrlRequest) -> dict:
     try:
         ensure_project(payload.project_id, auth.current_user_id(request))
@@ -160,11 +183,11 @@ async def remember_url(request: Request, payload: RememberUrlRequest) -> dict:
     except KeyError:
         raise HTTPException(status_code=404, detail="Project not found") from None
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise memory_error(exc) from exc
     return {"status": "remembered"}
 
 
-@app.post("/memory/remember/file")
+@app.post("/memory/remember/file", dependencies=[Depends(auth.require_access)])
 async def remember_file(request: Request, project_id: str, file: UploadFile = File(...)) -> dict:
     try:
         ensure_project(project_id, auth.current_user_id(request))
@@ -172,16 +195,29 @@ async def remember_file(request: Request, project_id: str, file: UploadFile = Fi
         raise HTTPException(status_code=404, detail="Project not found") from None
 
     suffix = Path(file.filename or "upload.txt").suffix
+    if suffix.lower() not in ALLOWED_UPLOAD_EXTENSIONS:
+        await file.close()
+        raise HTTPException(status_code=415, detail="Unsupported file type. Upload text, code, PDF, or DOCX files.")
     try:
         with NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
             temp_path = Path(temp_file.name)
-            temp_file.write(await file.read())
+            size = 0
+            while chunk := await file.read(64 * 1024):
+                size += len(chunk)
+                if size > MAX_UPLOAD_BYTES:
+                    raise HTTPException(status_code=413, detail="Files must be 10 MB or smaller.")
+                temp_file.write(chunk)
+            if size == 0:
+                raise HTTPException(status_code=422, detail="The uploaded file is empty.")
         await cognee_memory.remember_file(project_id, temp_path)
         touch_project(project_id)
         log_event(project_id, "remember()", "file", "File uploaded", file.filename or "uploaded file")
+    except HTTPException:
+        raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise memory_error(exc) from exc
     finally:
+        await file.close()
         if "temp_path" in locals() and temp_path.exists():
             temp_path.unlink(missing_ok=True)
     return {"status": "remembered"}
@@ -203,7 +239,7 @@ def _format_session_memory(payload: RememberSessionRequest) -> str:
     return "\n".join(lines).strip()
 
 
-@app.post("/memory/remember/session")
+@app.post("/memory/remember/session", dependencies=[Depends(auth.require_access)])
 async def remember_session(request: Request, payload: RememberSessionRequest) -> dict:
     try:
         ensure_project(payload.project_id, auth.current_user_id(request))
@@ -214,24 +250,24 @@ async def remember_session(request: Request, payload: RememberSessionRequest) ->
     except KeyError:
         raise HTTPException(status_code=404, detail="Project not found") from None
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise memory_error(exc) from exc
     return {"status": "remembered"}
 
 
-@app.post("/memory/recall")
+@app.post("/memory/recall", dependencies=[Depends(auth.require_access)])
 async def recall(request: Request, payload: RecallRequest) -> dict:
     try:
         ensure_project(payload.project_id, auth.current_user_id(request))
         answer = await cognee_memory.recall(payload.project_id, payload.query)
-        log_event(payload.project_id, "recall()", "query", payload.query, answer[:1200])
+        log_event(payload.project_id, "recall()", "query", payload.query, answer)
     except KeyError:
         raise HTTPException(status_code=404, detail="Project not found") from None
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise memory_error(exc) from exc
     return {"answer": answer}
 
 
-@app.post("/memory/improve")
+@app.post("/memory/improve", dependencies=[Depends(auth.require_access)])
 async def improve(request: Request, payload: ImproveRequest) -> dict:
     try:
         ensure_project(payload.project_id, auth.current_user_id(request))
@@ -241,19 +277,20 @@ async def improve(request: Request, payload: ImproveRequest) -> dict:
     except KeyError:
         raise HTTPException(status_code=404, detail="Project not found") from None
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise memory_error(exc) from exc
     return {"status": "improved"}
 
 
-@app.post("/memory/forget")
+@app.post("/memory/forget", dependencies=[Depends(auth.require_access)])
 async def forget(request: Request, payload: ForgetRequest) -> dict:
     try:
         ensure_project(payload.project_id, auth.current_user_id(request))
         await cognee_memory.forget(payload.project_id)
+        clear_project_events(payload.project_id)
         touch_project(payload.project_id)
         log_event(payload.project_id, "forget()", "system", "Dataset forgotten", "Cognee pruned the selected project dataset.")
     except KeyError:
         raise HTTPException(status_code=404, detail="Project not found") from None
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise memory_error(exc) from exc
     return {"status": "forgotten"}

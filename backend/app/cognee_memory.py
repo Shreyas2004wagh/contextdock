@@ -2,10 +2,18 @@ from __future__ import annotations
 
 import inspect
 import os
+import mimetypes
 from pathlib import Path
 from typing import Any
 
 import httpx
+from .url_content import fetch_url_text
+
+
+class CloudMemoryError(RuntimeError):
+    def __init__(self, status_code: int):
+        self.status_code = status_code
+        super().__init__(f"Cognee Cloud returned HTTP {status_code}.")
 
 
 def dataset_name(project_id: str) -> str:
@@ -32,12 +40,7 @@ def _cloud_url(path: str) -> str:
 async def _raise_for_cloud_error(response: httpx.Response) -> None:
     if response.is_success:
         return
-    detail: Any
-    try:
-        detail = response.json()
-    except ValueError:
-        detail = response.text
-    raise RuntimeError(f"Cognee Cloud request failed ({response.status_code}): {detail}")
+    raise CloudMemoryError(response.status_code)
 
 
 async def _cloud_remember_bytes(project_id: str, filename: str, data: bytes, content_type: str) -> Any:
@@ -73,9 +76,9 @@ async def _cloud_recall(project_id: str, query: str) -> Any:
 async def _cloud_improve(project_id: str) -> Any:
     async with httpx.AsyncClient(timeout=120.0) as client:
         response = await client.post(
-            _cloud_url("cognify"),
+            _cloud_url("improve"),
             headers={**_cloud_headers(), "Content-Type": "application/json"},
-            json={"datasets": [dataset_name(project_id)], "run_in_background": False},
+            json={"datasetName": dataset_name(project_id), "runInBackground": False},
         )
     await _raise_for_cloud_error(response)
     return response.json()
@@ -110,9 +113,8 @@ async def remember_text(project_id: str, title: str, content: str) -> Any:
 
 
 async def remember_url(project_id: str, url: str) -> Any:
-    if _cloud_configured():
-        return await _cloud_remember_bytes(project_id, "url.txt", url.encode(), "text/plain")
-    return await _call_cognee("remember", url, dataset_name=dataset_name(project_id))
+    text = await fetch_url_text(url)
+    return await remember_text(project_id, "Web page memory", text)
 
 
 async def remember_file(project_id: str, file_path: Path) -> Any:
@@ -121,7 +123,7 @@ async def remember_file(project_id: str, file_path: Path) -> Any:
             project_id,
             file_path.name,
             file_path.read_bytes(),
-            "application/octet-stream",
+            mimetypes.guess_type(file_path.name)[0] or "application/octet-stream",
         )
     with file_path.open("rb") as file:
         return await _call_cognee("remember", file, dataset_name=dataset_name(project_id))
