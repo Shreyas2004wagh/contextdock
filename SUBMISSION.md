@@ -26,11 +26,11 @@ Where's My Context? gives each project a Cognee-backed memory space. The product
 
 ## Demo Flow
 
-1. Open the app and confirm the hero says **Your AI agent remembers every project.**
+1. Open the app and confirm the hero says **Memory for coding agents.**
 2. Show the GitHub and Google sign-in options.
 3. Sign in, then open the authenticated memory workspace.
 4. Click **New Memory Space**.
-5. Click **Try Live Memory Case**.
+5. Click **Run memory case**.
 6. Watch it remember an agent session and release context note.
 7. Show the action trail entries for `remember()`, `improve()`, and `recall()`.
 8. Show the Handoff Brief with decisions, blockers, files, and next action.
@@ -44,20 +44,20 @@ The demo is not a generic chat app with saved messages. It is a builder-focused 
 
 - **Potential Impact:** coding agents and LLM tools can resume real project work instead of starting from a blank context window.
 - **Creativity & Innovation:** the project turns Codex-style work sessions into persistent project memory, not just chat history.
-- **Technical Excellence:** FastAPI and React connect to Cognee lifecycle APIs with project-scoped datasets and local timeline metadata.
+- **Technical Excellence:** FastAPI and React connect to Cognee lifecycle APIs with project-scoped datasets, ownership checks, bounded uploads, and database-backed timeline metadata. PostgreSQL is supported for production; SQLite supports local development.
 - **Best Use of Cognee:** `remember()`, `recall()`, `improve()`, and `forget()` are visible, demoable product actions.
 - **User Experience:** the first screen is a product landing page with OAuth CTAs; the real memory workspace appears after sign-in.
 - **Presentation Quality:** the README, screenshot, and demo flow all explain the same story: the agent wakes up and Cognee remembers.
 
 ## AI Assistant Disclosure
 
-AI coding assistants were used for limited development support and iteration. The project idea, product direction, implementation choices, and final submission were directed by me.
+AI coding assistants assisted with implementation, frontend design iterations, debugging, tests, and documentation. The project idea, product direction, implementation choices, and final submission were directed by me.
 
 ## Final Submission Checklist
 
 - Repository: https://github.com/Shreyas2004wagh/cogneeProject
 - Local run: start the FastAPI backend on `127.0.0.1:8000`, then start the Vite frontend on `127.0.0.1:5173`.
-- Demo recording: open the app, show GitHub/Google sign-in, sign in, confirm the Cognee Cloud Receipt says `Cognee Cloud`, click **New Memory Space**, click **Try Live Memory Case**, then show the Handoff Brief, lifecycle chips, action trail, and copied memory receipt.
+- Verify production OAuth, external database persistence, and a complete live Cognee lifecycle run before recording. Configured Cloud mode alone does not prove connectivity.
 - Safety: rotate the Cognee API key before public submission because it was shared during testing.
 - Disclosure: include the AI assistant disclosure above in the submission form.
 
