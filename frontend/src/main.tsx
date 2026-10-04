@@ -3,7 +3,6 @@ import { createRoot } from "react-dom/client";
 import {
   ArrowRight,
   Brain,
-  CheckCircle2,
   Clock3,
   Code2,
   Copy,
@@ -23,6 +22,7 @@ import {
   ShieldCheck,
   Sparkles,
   Trash2,
+  X,
 } from "lucide-react";
 import {
   API_BASE,
@@ -48,6 +48,7 @@ import {
   rememberUrl,
 } from "./api";
 import "./styles.css";
+import { MemoryPreview } from "./MemoryPreview";
 
 type FeedItem = {
   kind: "memory" | "answer" | "system";
@@ -57,22 +58,23 @@ type FeedItem = {
   related?: string;
 };
 
-const demoMemory = `Release Atlas shipped a new pull request review flow yesterday.
-The agent touched the FastAPI memory routes, the React command surface, and the Vercel deployment configuration.
-The main decision was to keep Cognee Cloud as the persistent memory layer while local JSON stores only timeline metadata.
-The active blocker is confirming the production OAuth callback configuration before rollout.
-Next action: verify GitHub and Google sign-in, then ask Cognee for the release handoff brief.`;
+const demoMemory = `Release Atlas is preparing its webhook delivery release.
+Yesterday the coding agent added bounded retries and an idempotency check to prevent duplicate deliveries.
+Changed files: src/webhooks/delivery.ts, src/webhooks/retry.ts, tests/webhooks.test.ts.
+Decision: retry failed deliveries three times with exponential backoff; keep each delivery's idempotency key for 24 hours.
+Blocker: the integration test for a timeout after a successful delivery is still failing.
+Next action: reproduce the timeout race, fix the idempotency check, and rerun the webhook test suite before merging.`;
 
 const demoSession: SessionMemory = {
   summary:
-    "Release Atlas is preparing an agent memory rollout that preserves product decisions, changed files, review status, and next actions across sessions.",
-  files_changed: "backend/app/main.py, backend/app/auth.py, frontend/src/main.tsx, frontend/src/api.ts",
-  commands_run: "python -m compileall backend; npm run build; curl /health; curl /auth/providers",
+    "Release Atlas: added webhook retries and duplicate delivery protection. The implementation is ready for review once the timeout integration test passes.",
+  files_changed: "src/webhooks/delivery.ts, src/webhooks/retry.ts, tests/webhooks.test.ts",
+  commands_run: "npm run test -- webhooks; npm run typecheck",
   decisions:
-    "Use Cognee Cloud for persistent project memory. Keep user/session metadata separate from memory content.",
-  blockers: "OAuth callback URLs need production verification before the agent memory workspace is shared.",
+    "Retry three times with exponential backoff. Retain idempotency keys for 24 hours.",
+  blockers: "The timeout-after-success integration test fails: a completed delivery may be retried.",
   next_tasks:
-    "Sign in, create a memory space, run the live memory case, and review the Cognee handoff brief.",
+    "Reproduce the timeout race, fix the idempotency check, and rerun the webhook suite before merging.",
 };
 
 const morningPrompt =
@@ -154,6 +156,9 @@ function App() {
   const [query, setQuery] = useState(judgePrompts[0]);
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [busy, setBusy] = useState(false);
+  const [builderTab, setBuilderTab] = useState("session");
+  const [workspaceView, setWorkspaceView] = useState("overview");
+  const [notice, setNotice] = useState<{title: string; body: string} | null>(null);
   const [demoStage, setDemoStage] = useState("Workspace ready. Start a live memory case when you want context back.");
   const [morningBriefAnswer, setMorningBriefAnswer] = useState("");
 
@@ -217,8 +222,8 @@ function App() {
   const selectedDataset = selectedId ? `project-${selectedId}` : "No dataset selected";
   const latestAnswer = feed.find((item) => item.kind === "answer");
   const latestRecall = events.find((event) => event.lifecycle === "recall()");
-  const providerLabel = health?.memory_mode === "cloud" ? "Cognee Cloud" : "Local Cognee SDK";
-  const cloudModeLabel = health?.memory_mode === "cloud" ? "Cognee Cloud online" : "Local memory mode";
+  const providerLabel = !health ? "Not connected" : health.memory_mode === "cloud" ? "Cognee Cloud" : "Local Cognee SDK";
+  const cloudModeLabel = !health ? "Memory service offline" : health.memory_mode === "cloud" ? "Cognee Cloud connected" : "Local memory connected";
   const proofSourceLabels = sourceSummary.length
     ? sourceSummary.map(([source, count]) => `${source} ${count}`).join(", ")
     : "no sources yet";
@@ -264,16 +269,27 @@ function App() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    setEvents([]);
+    setMorningBriefAnswer("");
+    setFeed([]);
     if (!selectedId) {
-      setEvents([]);
-      setMorningBriefAnswer("");
       return;
     }
-    loadEvents(selectedId, true);
+    getProjectEvents(selectedId).then((items) => {
+      if (cancelled) return;
+      setEvents(items);
+      const brief = items.find((event) => event.lifecycle === "recall()" && event.title === morningPrompt);
+      setMorningBriefAnswer(brief?.detail ?? "");
+    }).catch((error) => {
+      if (!cancelled) push("system", "system", "Could not load this memory space", error.message);
+    });
+    return () => { cancelled = true; };
   }, [selectedId]);
 
   function push(kind: FeedItem["kind"], source: string, titleText: string, body: string, related?: string) {
     setFeed((items) => [{ kind, source, title: titleText, body, related }, ...items].slice(0, 16));
+    if (kind !== "answer") setNotice({title: titleText, body});
   }
 
   async function loadEvents(projectId: string, syncMorningBrief = false) {
@@ -401,6 +417,7 @@ function App() {
   }
 
   function handleMorningBrief() {
+    setWorkspaceView("overview");
     setQuery(morningPrompt);
     withBusy(async () => {
       setDemoStage("recall() is building the morning brief.");
@@ -433,12 +450,14 @@ function App() {
   }
 
   function handleFreshDemoProject() {
+    setWorkspaceView("overview");
     withBusy(async () => {
       await createFreshDemoProject();
     });
   }
 
   function handleRunDemo() {
+    setWorkspaceView("overview");
     withBusy(async () => {
       let projectId = selectedId;
       if (!projectId) {
@@ -514,22 +533,22 @@ function App() {
     withBusy(async () => {
       await logout();
       setCurrentUser(null);
+      setNotice(null);
+      setWorkspaceView("overview");
       setProjects(await getProjects());
       setDemoStage("Signed out. Guest memory spaces are still available.");
     });
   }
 
   return (
-    <main className="shell">
+    <main className={`shell ${isSignedIn ? "workspace-shell" : "landing-shell"}`}>
       <nav className="top-nav" aria-label="Primary navigation">
         <a className="brand-mark" href="#home">
-          <Brain size={18} />
+          <span className="logo-icon"><Brain size={20} /></span>
           <span>Where's My Context?</span>
         </a>
         <div className="nav-links">
-          <a href={isSignedIn ? "#live-case" : "#how-it-works"}>{isSignedIn ? "Live Case" : "How It Works"}</a>
-          <a href={isSignedIn ? "#proof" : "#signin"}>{isSignedIn ? "Proof" : "Sign In"}</a>
-          <a href="#architecture">Architecture</a>
+          {isSignedIn ? <span className="workspace-nav-label">Your memory workspace</span> : <><a href="#product-preview">Product</a><a href="#how-it-works">How it works</a><a href={repositoryUrl} target="_blank" rel="noreferrer">Open source <ArrowRight size={12} /></a></>}
         </div>
         <div className="nav-actions">
           {currentUser ? (
@@ -543,45 +562,36 @@ function App() {
               </button>
             </>
           ) : (
-            <>
-              <a
-                aria-disabled={!authProviders?.github.available}
-                className={authProviders?.github.available ? "nav-button secondary-link" : "nav-button disabled-link"}
-                href={authProviders?.github.available ? loginUrl("github") : undefined}
-              >
-                <Github size={16} />
-                Start with GitHub
-              </a>
-              <a
-                aria-disabled={!authProviders?.google.available}
-                className={authProviders?.google.available ? "nav-button secondary-link" : "nav-button disabled-link"}
-                href={authProviders?.google.available ? loginUrl("google") : undefined}
-              >
-                <Sparkles size={16} />
-                Continue with Google
-              </a>
-              {authProviders?.dev?.available ? (
-                <a className="nav-button secondary-link" href={devLoginUrl()}>
-                  <Brain size={16} />
-                  Continue as Demo User
-                </a>
-              ) : null}
-            </>
+            <a className="nav-login" href="#signin">Sign in</a>
           )}
-          <a className="nav-button primary-link" href={isSignedIn ? "#live-case" : "#signin"}>
-            <Play size={16} />
-            {isSignedIn ? "Try Live Memory Case" : "Open Workspace"}
+          <a className="nav-button primary-link" onClick={() => isSignedIn && setWorkspaceView("overview")} href={isSignedIn ? "#live-case" : "#signin"}>
+            {isSignedIn ? <Play size={16} /> : <ArrowRight size={16} />}
+            {isSignedIn ? "Live memory case" : "Get started"}
           </a>
         </div>
       </nav>
+      {notice && isSignedIn ? <div className="action-notice" role="status"><div><strong>{notice.title}</strong><p>{notice.body}</p></div><button className="icon-button" type="button" onClick={() => setNotice(null)} aria-label="Dismiss notification"><X size={16}/></button></div> : null}
 
+      {!isSignedIn ? (
+        <section className="landing-hero" id="home">
+          <a className="release-tag" href="#how-it-works"><span className="connection-dot" /> A new session. Never a fresh start. <ArrowRight size={14} /></a>
+          <h1>Memory for<br /><span>coding agents.</span></h1>
+          <p className="hero-description">Close the chat. Keep the context.<br />Your files, decisions, and next steps, ready whenever you are.</p>
+          <div className="hero-actions">
+            <a className="demo-button auth-cta" href="#signin">Find your context <ArrowRight size={17} /></a>
+            <a className="text-link" href="#product-preview"><Play size={14} /> See it in action</a>
+          </div>
+          <div className="hero-caption"><ShieldCheck size={14} /> Project-scoped memory <span /> Sessions, files, notes & URLs</div>
+          <MemoryPreview />
+          <div className="product-signature"><span>BUILT FOR THE WAY YOU CODE</span><span><Code2 size={17} /> Session context</span><span><GitBranch size={17} /> Project decisions</span><span><Database size={17} /> Cognee memory</span></div>
+        </section>
+      ) : (
       <section className="story-hero" id="home">
         <div className="hero-copy">
-          <span className="eyebrow">Agent Memory OS / powered by Cognee Cloud</span>
-          <h1>Your AI agent remembers every project.</h1>
+          <span className="eyebrow">Workspace / {selectedProject?.name ?? "Getting started"}</span>
+          <h1>{workspaceView === "overview" ? "Pick up where you left off." : workspaceView === "recall" ? "Ask your project memory." : workspaceView === "activity" ? "Every action, accounted for." : "Keep what matters."}</h1>
           <p>
-            Persist files, decisions, blockers, commands, and release context so every coding agent can recover the
-            exact memory it needs before it touches your codebase.
+            A clear handoff from your last session to your next move.
           </p>
           <div className="hero-actions">
             {!currentUser ? (
@@ -614,7 +624,7 @@ function App() {
               <>
                 <button className="demo-button" disabled={busy} onClick={handleRunDemo} type="button">
                   <Play size={18} />
-                  {busy ? "Running memory case..." : "Try Live Memory Case"}
+                  {busy ? "Recovering context..." : "Run memory case"}
                 </button>
                 <button className="secondary" disabled={busy} onClick={handleFreshDemoProject} type="button">
                   <Sparkles size={18} />
@@ -632,10 +642,8 @@ function App() {
               </a>
             )}
           </div>
-          {authProviders && (!authProviders.github.available || !authProviders.google.available) ? (
-            <p className="oauth-note">Sign-in activates when workspace authentication is configured.</p>
-          ) : null}
-          <div className="status-strip" aria-label="Demo execution status">
+          <div className="workspace-select"><label htmlFor="active-space">Memory space</label><select id="active-space" value={selectedId} onChange={(event) => setSelectedId(event.target.value)} disabled={busy || !projects.length}><option value="">Select a space</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></div>
+          <div className="status-strip" aria-label="Memory execution status">
             {isSignedIn ? (
               <>
                 <span className={lastLifecycle === "waiting" ? "" : "active"}>{lastLifecycle}</span>
@@ -652,25 +660,25 @@ function App() {
           </div>
         </div>
 
-        <section className="case-card" aria-label="Live coding session case">
+        <section className="case-card" aria-label="Live coding session case" hidden={workspaceView !== "overview"}>
           <div className="case-topline">
             <span className="source">CASE ARC-142</span>
             <span>{isSignedIn ? "Release agent memory" : "Workspace preview"}</span>
           </div>
           <div className="case-title-row">
             <div>
-              <h2>{isSignedIn ? "Agent handoff recovered" : "Sign in to unlock the workspace"}</h2>
+              <h2>Session draft</h2>
               <p>
                 {isSignedIn
                   ? productText(selectedProject?.name ?? "Create or select a memory space to begin.")
                   : "Create private memory spaces, run Cognee lifecycle calls, and recover project context from any session."}
               </p>
             </div>
-            <CheckCircle2 size={28} />
+            <Code2 size={24} />
           </div>
           <div className="stage-rail" aria-label="Cognee case stages">
             {caseStages.map((stage, index) => (
-              <div className={index === 0 || lifecycleCounts[stage] || stage === "Handoff Brief" ? "stage active" : "stage"} key={stage}>
+              <div className={lifecycleCounts[stage] || (stage === "Handoff Brief" && morningBriefAnswer) ? "stage active" : "stage"} key={stage}>
                 <span>{String(index + 1).padStart(2, "0")}</span>
                 <strong>{stage}</strong>
               </div>
@@ -694,23 +702,19 @@ function App() {
               <p>{session.next_tasks}</p>
             </article>
           </div>
-          <div className="case-actions">
-            <span>{isSignedIn ? "Suggested next actions" : "Workspace unlocks"}</span>
-            <p>
-              {isSignedIn
-                ? "Verify OAuth callbacks, review changed files, and ask Cognee for the next release action."
-                : "Project memories, handoff briefs, source labels, lifecycle proof, and builder controls."}
-            </p>
-          </div>
           <p className="demo-stage">
             {isSignedIn ? demoStage : "Sign in to open the real memory workspace."}
           </p>
         </section>
       </section>
+      )}
 
       {isSignedIn ? (
         <>
-      <section className="live-workspace" id="live-case">
+      <nav className="workspace-views" aria-label="Workspace views">
+        {[{id:"overview",label:"Overview",icon:Brain},{id:"recall",label:"Ask memory",icon:MessageSquareText},{id:"activity",label:"Activity",icon:Clock3},{id:"capture",label:"Capture",icon:FileUp}].map(({id,label,icon:Icon}) => <button key={id} type="button" aria-current={workspaceView === id ? "page" : undefined} onClick={() => setWorkspaceView(id)}><Icon size={16}/>{label}{id === "activity" && events.length > 0 ? <span>{events.length}</span> : null}</button>)}
+      </nav>
+      <section className="live-workspace" id="live-case" hidden={workspaceView !== "overview"}>
         <section className="brief-panel">
           <div className="panel-heading">
             <MessageSquareText size={20} />
@@ -719,9 +723,15 @@ function App() {
               <h2>Recovered context</h2>
             </div>
           </div>
-          <div className="brief-answer">
-            <span>{morningBriefAnswer ? "Cognee recall answer" : "Waiting for recall()"}</span>
-            <p>{visibleBrief}</p>
+          <div className="brief-answer" aria-busy={busy}>
+            {morningBriefAnswer || latestAnswer ? <><span>Cognee recall answer</span><p>{visibleBrief}</p></> : (
+              <div className="brief-empty">
+                <div className="empty-memory-mark"><FileUp size={19} /><span /><Brain size={34} /><span /><MessageSquareText size={19} /></div>
+                <h3>{busy ? "Bringing your context together." : "Your next chapter starts here."}</h3>
+                <p>{busy ? demoStage : "Save a session or explore the example. Your handoff brief will be waiting here."}</p>
+                <div className="actions"><button type="button" disabled={busy} onClick={() => setWorkspaceView("capture")}><Code2 size={15} />Capture a session</button><button className="ghost-button" type="button" disabled={busy} onClick={handleRunDemo}><Play size={14} />Run example</button></div>
+              </div>
+            )}
           </div>
         </section>
 
@@ -767,11 +777,11 @@ function App() {
               <span className="source">no sources yet</span>
             )}
           </div>
-          <div className="memory-map" aria-label="Memory graph preview">
+          <div className="memory-map" aria-label="Project memory activity">
             <div className="graph-core">
               <Brain size={20} />
               <strong>Cognee</strong>
-              <span>{health?.memory_mode === "cloud" ? "Cloud graph" : "Local graph"}</span>
+              <span>Activity map</span>
             </div>
             <div className="graph-nodes">
               {memoryGraphNodes.length ? (
@@ -784,7 +794,7 @@ function App() {
               ) : (
                 <span className="graph-node empty">
                   <strong>waiting</strong>
-                  <small>run case to draw proof</small>
+                  <small>No activity yet</small>
                 </span>
               )}
             </div>
@@ -792,7 +802,7 @@ function App() {
         </section>
       </section>
 
-      <section className="proof-row">
+      <section className="proof-row" hidden={workspaceView !== "activity"}>
         <section className="panel lifecycle">
           <div className="panel-heading">
             <Network size={20} />
@@ -830,57 +840,7 @@ function App() {
         </section>
       </section>
 
-      <section className="story-section">
-        <div className="section-heading">
-          <span className="eyebrow">How it works</span>
-          <h2>From yesterday's context to today's next action.</h2>
-        </div>
-        <div className="story-grid four">
-          {howItWorks.map((item, index) => (
-            <article className="story-card" key={item.title}>
-              <span>{String(index + 1).padStart(2, "0")}</span>
-              <h3>{item.title}</h3>
-              <p>{item.body}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="story-section evidence-section">
-        <div className="section-heading">
-          <span className="eyebrow">Every brief shows its work</span>
-          <h2>Source labels make the memory path visible.</h2>
-        </div>
-        <div className="evidence-grid">
-          {["session", "note", "file", "url", "query", "system"].map((source) => (
-            <article className="evidence-card" key={source}>
-              <span className="source">{source}</span>
-              <p>{sourceSummary.find(([name]) => name === source)?.[1] ?? 0} remembered events</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="story-section architecture-section" id="architecture">
-        <div className="section-heading">
-          <span className="eyebrow">Architecture</span>
-          <h2>One product surface, real Cognee lifecycle calls.</h2>
-        </div>
-        <div className="story-grid four">
-          {architectureItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <article className="story-card architecture-card" key={item.title}>
-                <Icon size={22} />
-                <h3>{productText(item.title)}</h3>
-                <p>{productText(item.body)}</p>
-              </article>
-            );
-          })}
-        </div>
-      </section>
-
-      <section className="recall-feed-grid">
+      <section className="recall-feed-grid" hidden={workspaceView !== "recall"}>
         <form className="panel recall" onSubmit={handleRecall}>
           <div className="panel-heading">
             <Search size={20} />
@@ -898,7 +858,7 @@ function App() {
             ))}
           </div>
           <div className="query-row">
-            <input value={query} onChange={(event) => setQuery(event.target.value)} />
+            <input aria-label="Ask your project memory" value={query} onChange={(event) => setQuery(event.target.value)} />
             <button disabled={busy || !selectedId} type="submit">
               <ArrowRight size={18} />
               Ask
@@ -931,15 +891,42 @@ function App() {
         </section>
       </section>
 
-      <section className="story-section builder-section">
+      <section className="story-section builder-section" id="builder" hidden={workspaceView !== "capture"}>
         <div className="section-heading">
-          <span className="eyebrow">Builder controls</span>
-          <h2>Build your own memory space when the live case is done.</h2>
+          <span className="eyebrow">Capture</span>
+          <h2>Add to your project memory.</h2>
+        </div>
+        <div className="builder-tabs" role="tablist" aria-label="Memory input type">
+          {["session", "sources", "spaces"].map((tab, index, tabs) => (
+            <button
+              key={tab}
+              role="tab"
+              aria-selected={builderTab === tab}
+              aria-controls={`capture-${tab}`}
+              id={`tab-${tab}`}
+              tabIndex={builderTab === tab ? 0 : -1}
+              onClick={() => setBuilderTab(tab)}
+              onKeyDown={(event) => {
+                const next = event.key === "ArrowRight" ? tabs[(index + 1) % tabs.length]
+                  : event.key === "ArrowLeft" ? tabs[(index + tabs.length - 1) % tabs.length]
+                  : event.key === "Home" ? tabs[0] : event.key === "End" ? tabs[tabs.length - 1] : null;
+                if (next) {
+                  event.preventDefault();
+                  setBuilderTab(next);
+                  document.getElementById(`tab-${next}`)?.focus();
+                }
+              }}
+              type="button"
+            >
+              {tab === "session" ? <Code2 size={16} /> : tab === "sources" ? <FileUp size={16} /> : <Database size={16} />}
+              {tab === "session" ? "Coding session" : tab === "sources" ? "Notes & sources" : "Memory spaces"}
+            </button>
+          ))}
         </div>
       </section>
 
-      <section className="builder-grid">
-        <form className="panel session-panel" onSubmit={handleRememberSession}>
+      <section className="builder-grid" hidden={workspaceView !== "capture"}>
+        <form className="panel session-panel" id="capture-session" role="tabpanel" aria-labelledby="tab-session" hidden={builderTab !== "session"} onSubmit={handleRememberSession}>
           <div className="panel-heading">
             <Code2 size={20} />
             <h2>Agent Session Memory</h2>
@@ -978,7 +965,7 @@ function App() {
           </button>
         </form>
 
-        <section className="builder-stack">
+        <section className="builder-stack" id="capture-sources" role="tabpanel" aria-labelledby="tab-sources" hidden={builderTab !== "sources"}>
           <form className="panel" onSubmit={handleRememberText}>
             <h2>Remember Note</h2>
             <label>
@@ -1019,7 +1006,7 @@ function App() {
           </div>
         </section>
 
-        <aside className="builder-stack">
+        <aside className="builder-stack" id="capture-spaces" role="tabpanel" aria-labelledby="tab-spaces" hidden={builderTab !== "spaces"}>
           <form className="panel" onSubmit={handleCreateProject}>
             <h2>Project Brain</h2>
             <label>
@@ -1043,6 +1030,7 @@ function App() {
                 <button
                   className={project.id === selectedId ? "project active" : "project"}
                   key={project.id}
+                  disabled={busy}
                   onClick={() => setSelectedId(project.id)}
                   type="button"
                 >
@@ -1075,11 +1063,10 @@ function App() {
         <>
           <section className="story-section landing-split" id="signin">
             <div className="section-heading">
-              <span className="eyebrow">Start private</span>
-              <h2>Sign in first. Then open your memory workspace.</h2>
+              <span className="eyebrow">A fresh session. A familiar context.</span>
+              <h2>Your next session<br />starts here.</h2>
               <p>
-                The live product is gated behind OAuth so every memory space can belong to a real user. Guest previews stay public;
-                project memory, recall, improve, forget, and builder controls unlock after sign-in.
+                Keep the decisions worth keeping. Recover the details that matter. Start a memory space for your next project.
               </p>
             </div>
             <div className="signin-card">
@@ -1102,11 +1089,11 @@ function App() {
               {authProviders?.dev?.available ? (
                 <a className="ghost-button auth-cta" href={devLoginUrl()}>
                   <Brain size={18} />
-                  Continue as Demo User
+                  Explore local workspace
                 </a>
               ) : null}
               {authProviders && (!authProviders.github.available || !authProviders.google.available) ? (
-                <p className="muted">OAuth provider credentials are not configured on this backend yet.</p>
+                <p className="muted">Some sign-in providers are currently unavailable.</p>
               ) : null}
             </div>
           </section>
@@ -1114,7 +1101,7 @@ function App() {
           <section className="story-section" id="how-it-works">
             <div className="section-heading">
               <span className="eyebrow">How it works</span>
-              <h2>From project activity to agent-ready memory.</h2>
+              <h2>Less re-explaining.<br />More moving forward.</h2>
             </div>
             <div className="story-grid four">
               {howItWorks.map((item, index) => (
@@ -1129,23 +1116,27 @@ function App() {
 
           <section className="story-section evidence-section">
             <div className="section-heading">
-              <span className="eyebrow">What unlocks after sign-in</span>
-              <h2>Actual memory operations, not a marketing mock.</h2>
+              <span className="eyebrow">Memory with a paper trail</span>
+              <h2>Keep the context.<br />See where it came from.</h2>
             </div>
             <div className="evidence-grid">
               {["remember()", "recall()", "improve()", "forget()", "source labels", "private spaces"].map((source) => (
                 <article className="evidence-card" key={source}>
                   <span className="source">{source}</span>
-                  <p>Available inside the authenticated workspace.</p>
+                  <p>{({"remember()": "Capture the work worth keeping.", "recall()": "Ask a question. Get context back.", "improve()": "Enrich your project memory.", "forget()": "Clear a space when you're done.", "source labels": "See the inputs behind your brief.", "private spaces": "Organize memory by project."} as Record<string, string>)[source]}</p>
                 </article>
               ))}
             </div>
           </section>
 
+          <section className="story-section workspace-tour">
+            <div className="section-heading"><span className="eyebrow">YOUR PROJECT'S SECOND MEMORY</span><h2>A place for everything<br />you shouldn't have to repeat.</h2><p>Capture the session. Ask a question. Trace the answer back to the work that came before.</p></div>
+            <img src="/workspace-preview.png" alt="The project workspace with a session draft, handoff brief, and Cognee memory receipt" width="1440" height="1000" />
+          </section>
           <section className="story-section architecture-section" id="architecture">
             <div className="section-heading">
               <span className="eyebrow">Architecture</span>
-              <h2>OAuth identity, FastAPI orchestration, Cognee Cloud memory.</h2>
+              <h2>Built on a real memory layer.</h2>
             </div>
             <div className="story-grid four">
               {architectureItems.map((item) => {
@@ -1162,6 +1153,7 @@ function App() {
           </section>
         </>
       )}
+      <footer className="site-footer"><a className="brand-mark" href="#home"><Brain size={18} /> Where's My Context?</a><span>Context that stays with you.</span><a href={repositoryUrl} target="_blank" rel="noreferrer"><Github size={16} /> View source <ArrowRight size={14} /></a></footer>
     </main>
   );
 }
