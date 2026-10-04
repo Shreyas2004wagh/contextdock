@@ -66,7 +66,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   });
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: response.statusText }));
-    throw new Error(error.detail ?? "Request failed");
+    const detail = Array.isArray(error.detail)
+      ? error.detail.map((item: { msg?: string }) => item.msg ?? "Invalid input").join("; ")
+      : error.detail;
+    throw new Error(typeof detail === "string" ? detail : "Request failed");
   }
   return response.json() as Promise<T>;
 }

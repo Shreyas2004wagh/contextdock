@@ -120,7 +120,7 @@ const architectureItems = [
   { icon: Code2, title: "React + Vite", body: "Product landing, live memory case, proof receipt, and builder controls." },
   { icon: Server, title: "FastAPI backend", body: "Project routes, Cognee lifecycle calls, uploads, and timeline metadata." },
   { icon: Database, title: "Cognee Cloud", body: "Persistent graph-vector memory scoped to each coding project." },
-  { icon: GitBranch, title: "Vercel + Render", body: "Frontend on Vercel, backend on Render, local JSON only for event proof." },
+  { icon: GitBranch, title: "Vercel + Render", body: "Frontend on Vercel, backend on Render, database-backed project and event history." },
 ];
 
 function productText(value: string) {
@@ -223,7 +223,7 @@ function App() {
   const latestAnswer = feed.find((item) => item.kind === "answer");
   const latestRecall = events.find((event) => event.lifecycle === "recall()");
   const providerLabel = !health ? "Not connected" : health.memory_mode === "cloud" ? "Cognee Cloud" : "Local Cognee SDK";
-  const cloudModeLabel = !health ? "Memory service offline" : health.memory_mode === "cloud" ? "Cognee Cloud connected" : "Local memory connected";
+  const cloudModeLabel = !health ? "Backend unavailable" : health.memory_mode === "cloud" ? "Cognee Cloud configured" : "Local memory configured";
   const proofSourceLabels = sourceSummary.length
     ? sourceSummary.map(([source, count]) => `${source} ${count}`).join(", ")
     : "no sources yet";
@@ -438,6 +438,7 @@ function App() {
   }
 
   function handleForget() {
+    if (!window.confirm(`Forget all stored memory and saved answers in "${selectedProject?.name ?? "this space"}"? This cannot be undone.`)) return;
     withBusy(async () => {
       const projectId = requireProject();
       setDemoStage("forget() is pruning the selected dataset.");
