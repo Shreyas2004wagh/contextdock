@@ -50,7 +50,7 @@ async def lifespan(app):
     yield
 
 
-app = FastAPI(title="Where's My Context API", lifespan=lifespan)
+app = FastAPI(title="ContextDock API", lifespan=lifespan)
 
 
 def memory_error(exc: Exception) -> HTTPException:

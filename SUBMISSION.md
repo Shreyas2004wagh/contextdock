@@ -1,4 +1,4 @@
-# Where's My Context? - Hackathon Submission
+# ContextDock - Hackathon Submission
 
 ## Track
 
@@ -14,7 +14,7 @@ LLMs and coding agents are powerful during a session, but they usually restart c
 
 ## Solution
 
-Where's My Context? gives each project a Cognee-backed memory space. The product opens as an Agent Memory OS: sign in with GitHub or Google, run a coding-agent memory case, store session context, improve the graph, recall a handoff brief, and show the Cognee Cloud Receipt without leaving the page.
+ContextDock gives each project a Cognee-backed memory space. The product opens as an Agent Memory OS: sign in with a configured provider, run a coding-agent memory case, store session context, improve the graph, recall a handoff brief, and show the Cognee Cloud Receipt without leaving the page.
 
 ## Why Cognee Is Core
 
@@ -55,7 +55,7 @@ AI coding assistants assisted with implementation, frontend design iterations, d
 
 ## Final Submission Checklist
 
-- Repository: https://github.com/Shreyas2004wagh/cogneeProject
+- Repository: https://github.com/Shreyas2004wagh/contextdock
 - Local run: start the FastAPI backend on `127.0.0.1:8000`, then start the Vite frontend on `127.0.0.1:5173`.
 - Verify production OAuth, external database persistence, and a complete live Cognee lifecycle run before recording. Configured Cloud mode alone does not prove connectivity.
 - Safety: rotate the Cognee API key before public submission because it was shared during testing.

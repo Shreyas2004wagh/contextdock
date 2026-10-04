@@ -93,7 +93,7 @@ const judgePrompts = [
   "What should the agent do next?",
 ];
 
-const repositoryUrl = "https://github.com/Shreyas2004wagh/cogneeProject";
+const repositoryUrl = "https://github.com/Shreyas2004wagh/contextdock";
 
 const caseStages = ["Trigger", "remember()", "improve()", "recall()", "Handoff Brief"];
 
@@ -234,7 +234,7 @@ function App() {
         "Start the live memory case to let Cognee reconstruct the latest decisions, blockers, files, and next action.",
     );
   const proofSummary = [
-    "Where's My Context? memory receipt",
+    "ContextDock memory receipt",
     `Provider: ${providerLabel}`,
     `Dataset: ${selectedDataset}`,
     `Remembered sources: ${rememberedSourceCount}`,
@@ -545,8 +545,8 @@ function App() {
     <main className={`shell ${isSignedIn ? "workspace-shell" : "landing-shell"}`}>
       <nav className="top-nav" aria-label="Primary navigation">
         <a className="brand-mark" href="#home">
-          <span className="logo-icon"><Brain size={20} /></span>
-          <span>Where's My Context?</span>
+          <img className="logo-icon" src="/favicon.svg" alt="" width="33" height="33" />
+          <span>ContextDock</span>
         </a>
         <div className="nav-links">
           {isSignedIn ? <span className="workspace-nav-label">Your memory workspace</span> : <><a href="#product-preview">Product</a><a href="#how-it-works">How it works</a><a href={repositoryUrl} target="_blank" rel="noreferrer">Open source <ArrowRight size={12} /></a></>}
@@ -1154,7 +1154,7 @@ function App() {
           </section>
         </>
       )}
-      <footer className="site-footer"><a className="brand-mark" href="#home"><Brain size={18} /> Where's My Context?</a><span>Context that stays with you.</span><a href={repositoryUrl} target="_blank" rel="noreferrer"><Github size={16} /> View source <ArrowRight size={14} /></a></footer>
+      <footer className="site-footer"><a className="brand-mark" href="#home"><img src="/favicon.svg" alt="" width="22" height="22" /> ContextDock</a><span>Context that stays with you.</span><a href={repositoryUrl} target="_blank" rel="noreferrer"><Github size={16} /> View source <ArrowRight size={14} /></a></footer>
     </main>
   );
 }

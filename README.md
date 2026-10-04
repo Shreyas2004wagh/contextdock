@@ -1,4 +1,4 @@
-# Where's My Context?
+# ContextDock
 
 An Agent Memory OS for coding agents that should not wake up with amnesia. The app uses Cognee as a permanent graph-vector memory layer so a project assistant can remember notes, files, URLs, decisions, blockers, and next actions across sessions.
 
@@ -15,7 +15,7 @@ The product makes Cognee's memory lifecycle the core user workflow:
 
 ## Submission pitch
 
-Agents and LLM tools wake up stateless. **Where's My Context?** gives them a persistent project brain, so a coding agent can remember yesterday's files, commands, decisions, blockers, and next tasks before starting the next session.
+Agents and LLM tools wake up stateless. **ContextDock** gives them a persistent project brain, so a coding agent can remember yesterday's files, commands, decisions, blockers, and next tasks before starting the next session.
 
 Cognee is central because the app does not just save local notes:
 
@@ -47,7 +47,7 @@ Cognee is central because the app does not just save local notes:
 
 ## Screenshot
 
-![Where's My Context workspace](frontend/public/workspace-preview.png)
+![ContextDock workspace preview (previous branding)](frontend/public/workspace-preview.png)
 
 ## Cognee lifecycle mapping
 
