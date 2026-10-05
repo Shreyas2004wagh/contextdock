@@ -1133,7 +1133,7 @@ function App() {
 
           <section className="story-section workspace-tour">
             <div className="section-heading"><span className="eyebrow">YOUR PROJECT'S SECOND MEMORY</span><h2>A place for everything<br />you shouldn't have to repeat.</h2><p>Capture the session. Ask a question. Trace the answer back to the work that came before.</p></div>
-            <img src="/workspace-preview.png" alt="The project workspace with a session draft, handoff brief, and Cognee memory receipt" width="1440" height="1000" />
+            <img src="/workspace-preview.png" alt="ContextDock workspace with a formatted handoff brief and Cognee memory receipt" width="1280" height="1229" />
           </section>
           <section className="story-section architecture-section" id="architecture">
             <div className="section-heading">

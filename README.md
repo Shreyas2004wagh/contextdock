@@ -47,7 +47,7 @@ Cognee is central because the app does not just save local notes:
 
 ## Screenshot
 
-![ContextDock workspace preview (previous branding)](frontend/public/workspace-preview.png)
+![ContextDock workspace with a formatted Cloud handoff brief](frontend/public/workspace-preview.png)
 
 ## Cognee lifecycle mapping
 
