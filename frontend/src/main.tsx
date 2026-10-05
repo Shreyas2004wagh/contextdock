@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { MemoryMarkdown } from "./MemoryMarkdown";
 import {
   ArrowRight,
   Brain,
@@ -725,7 +726,7 @@ function App() {
             </div>
           </div>
           <div className="brief-answer" aria-busy={busy}>
-            {morningBriefAnswer || latestAnswer ? <><span>Cognee recall answer</span><p>{visibleBrief}</p></> : (
+            {morningBriefAnswer || latestAnswer ? <><span>Cognee recall answer</span><MemoryMarkdown>{visibleBrief}</MemoryMarkdown></> : (
               <div className="brief-empty">
                 <div className="empty-memory-mark"><FileUp size={19} /><span /><Brain size={34} /><span /><MessageSquareText size={19} /></div>
                 <h3>{busy ? "Bringing your context together." : "Your next chapter starts here."}</h3>
@@ -833,7 +834,7 @@ function App() {
                   <span className="source">{event.source}</span>
                 </div>
                 <strong>{productText(event.title)}</strong>
-                <p>{productText(event.detail)}</p>
+                {event.lifecycle === "recall()" ? <MemoryMarkdown>{productText(event.detail)}</MemoryMarkdown> : <p>{productText(event.detail)}</p>}
               </article>
             ))}
             {events.length === 0 ? <p className="muted">Lifecycle events will appear here.</p> : null}
@@ -879,7 +880,7 @@ function App() {
                   {item.related ? <span>{item.related}</span> : null}
                 </div>
                 <h3>{item.title}</h3>
-                <p>{item.body}</p>
+                {item.kind === "answer" ? <MemoryMarkdown>{item.body}</MemoryMarkdown> : <p>{item.body}</p>}
               </div>
             </article>
           ))}

@@ -145,8 +145,8 @@ svg { flex-shrink: 0; stroke-width: 1.65; }
 .brief-answer::before { display: none; }
 .brief-answer p { font-family: inherit; font-size: 13px; line-height: 1.85; color: #c6cec9; max-height: 350px; overflow-wrap: anywhere; }
 .receipt-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; }
-.receipt-grid article { gap: 7px; min-height: 0; padding: 0; background: transparent; border: 0; }
-.receipt-grid strong { font-family: 'IBM Plex Mono',monospace; font-size: 11px; font-weight: 400; color: #d0d7d3; }
+.receipt-grid article { gap: 7px; min-width: 0; min-height: 0; padding: 0; background: transparent; border: 0; }
+.receipt-grid strong { min-width: 0; overflow-wrap: anywhere; font-family: 'IBM Plex Mono',monospace; font-size: 11px; font-weight: 400; color: #d0d7d3; }
 .memory-map { border: 0; border-top: 1px solid #303633; border-radius: 0; background: transparent; padding: 15px 0 0; grid-template-columns: 86px 1fr; gap: 16px; min-height: 0; }
 .graph-core { border: 0; border-right: 1px solid #38413a; border-radius: 0; background: transparent; min-height: 70px; }
 .graph-core svg { color: #b8edcf; }
@@ -407,3 +407,24 @@ body:has(.landing-shell) { background: #f4f6f3; color-scheme: light; }
   .action-notice { right: 16px; bottom: 16px; }
 }
 @media (prefers-reduced-motion: reduce) { .example-answer { animation: none; } }
+
+.memory-markdown, .timeline-item .memory-markdown { display: block; min-width: 0; max-width: 100%; color: #c6cec9; font-size: 13px; line-height: 1.75; overflow-wrap: anywhere; }
+.workspace-shell .memory-markdown p { white-space: normal; overflow: visible; max-height: none; font-size: inherit; line-height: inherit; color: inherit; margin: 0 0 12px; }
+.memory-markdown > :last-child { margin-bottom: 0; }
+.memory-markdown :is(h3, h4, h5, h6) { font-size: 15px; font-weight: 650; line-height: 1.4; color: #edf4ee; margin: 20px 0 10px; }
+.memory-markdown > :first-child { margin-top: 0; }
+.memory-markdown :is(ul, ol) { margin: 0 0 16px; padding-left: 22px; }
+.memory-markdown li { padding-left: 3px; margin: 5px 0; }
+.memory-markdown li > p { margin-bottom: 4px; }
+.memory-markdown strong, .workspace-shell .timeline-item .memory-markdown strong { color: #edf4ee; font-size: inherit; font-weight: 650; }
+.memory-markdown code { font-family: 'IBM Plex Mono', monospace; font-size: .9em; background: #ffffff09; color: #b9ecd2; padding: 2px 5px; border-radius: 3px; }
+.memory-markdown pre { max-width: 100%; overflow-x: auto; background: #101512; padding: 14px; border: 1px solid #304132; border-radius: 5px; margin: 12px 0 16px; }
+.memory-markdown pre code { padding: 0; background: none; overflow-wrap: normal; white-space: pre; }
+.memory-markdown a { color: #b9ecd2; text-decoration: underline; text-underline-offset: 3px; }
+.memory-markdown blockquote { margin: 12px 0; padding-left: 14px; border-left: 2px solid #77ab8a; }
+.memory-markdown hr { border: 0; border-top: 1px solid #304132; margin: 18px 0; }
+.memory-markdown .markdown-table { display: block; max-width: 100%; overflow-x: auto; margin: 12px 0; }
+.memory-markdown table { width: 100%; border-collapse: collapse; }
+.memory-markdown :is(th, td) { text-align: left; border: 1px solid #304132; padding: 8px 10px; }
+.memory-markdown input[type="checkbox"] { width: auto; margin-right: 6px; accent-color: #b9ecd2; }
+.timeline-item .memory-markdown { font-size: 12px; }
